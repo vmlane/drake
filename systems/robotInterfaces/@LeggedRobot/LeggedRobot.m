@@ -24,7 +24,5 @@ classdef LeggedRobot
       load(obj.fixed_point_file, 'xstar');
     end
   end
-
-
 end
 
