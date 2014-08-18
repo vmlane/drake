@@ -52,10 +52,10 @@ walk_info = struct('feet', {{'l', 'r'}}, ...
                                                       0.2;
                                                       pi/8;
                                                       0.01])),...
-                  'gait', struct('r', {1, 0, 1, 1}, 'l', {1, 1, 1, 0}));
+                  'gait', struct('r', {0, 1}, 'l', {1, 0}));
 
 % TODO: generalize
-nframes = length(walk_info.gait) * floor(nsteps / 2) + 1;
+nframes = nsteps;
 
 nregions = length(seed_plan.safe_regions);
 
@@ -160,6 +160,10 @@ for j = 1:nframes
     if j < nframes
       constraints = [constraints,...
                      sum(yaw_sector(max(s-1, 1):min(s+1, size(yaw_sector,1)), j+1)) >= yaw_sector(s, j)];
+    end
+    if j < nframes - 1
+      constraints = [constraints,...
+                     sum(yaw_sector(max(s-1, 1):min(s+1, size(yaw_sector,1)), j+2)) >= yaw_sector(s, j)];
     end
   end
 end
