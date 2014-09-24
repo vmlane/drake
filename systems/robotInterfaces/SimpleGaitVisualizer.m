@@ -1,4 +1,9 @@
 classdef SimpleGaitVisualizer < Visualizer
+% This is a *very* basic visualizer for legged robots. The purpose of this class
+% is to make it easy to display footstep plans for robots with arbitrary numbers
+% of legs using the same visualizer. No information other than the pose of the 
+% robot's body and feet is used to display, so every robot will just look like
+% a collection of black sticks. 
   properties
     feet = {};
     safeRegions = struct('A', {}, 'b', {}, 'point', {}, 'normal', {});
@@ -26,7 +31,8 @@ classdef SimpleGaitVisualizer < Visualizer
         set(hFig,'DoubleBuffer', 'on');
       end
       
-      figure(25); clf; hold on;
+      figure(25); 
+      cla; hold on;
       
       for j = 1:length(obj.safeRegions)
         reg = obj.safeRegions(j);
@@ -34,9 +40,6 @@ classdef SimpleGaitVisualizer < Visualizer
         V = V';
         V = V(1:2, convhull(V(1,:), V(2,:)));
         
-        % n' * v == n' * p
-        % n(3) * v(3) == n' * p - n(1) * v(1) - n(2) * v(2);
-        % v(3) == 1/n(3) * (n' * p - (n(1:2)' * v(1:2)))
         V(3,:) = 1/(reg.normal(3)) * (reg.normal' * reg.point - (reg.normal(1:2)' * V(1:2,:)));
         
         patch(V(1,:), V(2,:), V(3,:), 'k', 'FaceColor', [0.8,0.8,0.8]);
@@ -57,6 +60,8 @@ classdef SimpleGaitVisualizer < Visualizer
                 'r', 'AutoScale', 'off')
       end
       axis equal
+      view(-140,44);
+      drawnow();
     end
   end
 end

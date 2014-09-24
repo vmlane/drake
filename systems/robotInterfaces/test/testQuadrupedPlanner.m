@@ -77,5 +77,6 @@ prob.start_pose = struct('body', [0;0;1.2;0;0;0],...
 prob.goal_pose = struct('body', [1;0;0.2;0;0;0]);
 
 sol = prob.solveYalmip();
+% save('sol.mat', 'sol');
 [xtraj, v] = sol.getSimpleGaitTrajectory();
 v.playback(xtraj, struct('slider', true));
