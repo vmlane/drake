@@ -1,0 +1,3 @@
+function testGaitedMISOCP()
+
+testFootstepSolver(@bipedGaitedMISOCP);

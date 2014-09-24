@@ -1,4 +1,5 @@
-function testFootstepSolvers()
+function testFootstepSolver(solver)
+%NOTEST
 
 checkDependency('yalmip');
 checkDependency('gurobi');
@@ -66,35 +67,34 @@ weights = struct('relative', [10;10;10;0;0;.5],...
                  'relative_final', [100;100;100;0;0;100],...
                  'goal', [100;100;0;0;0;1000]);
 
-function test_solver(solver)
-  nsteps = params.max_num_steps + 2;
-  seed_plan = FootstepPlan.blank_plan(r, nsteps, [r.foot_frame_id.right, r.foot_frame_id.left], params, safe_regions);
-  seed_plan.footsteps(1).pos = foot_orig.right;
-  seed_plan.footsteps(2).pos = foot_orig.left;
-  plan = solver(r, seed_plan, weights, goal_pos);
+nsteps = params.max_num_steps + 2;
+seed_plan = FootstepPlan.blank_plan(r, nsteps, [r.foot_frame_id.right, r.foot_frame_id.left], params, safe_regions);
+seed_plan.footsteps(1).pos = foot_orig.right;
+seed_plan.footsteps(2).pos = foot_orig.left;
+plan = solver(r, seed_plan, weights, goal_pos);
 
-  clf
-  nsteps = length(plan.footsteps);
-  r_ndx = 2:2:nsteps;
-  l_ndx = 1:2:nsteps;
-  steps = plan.step_matrix();
-  quiver(steps(1,r_ndx), steps(2, r_ndx), cos(steps(6,r_ndx)), sin(steps(6,r_ndx)), 'b', 'AutoScaleFactor', 0.2)
-  hold on
-  quiver(steps(1,l_ndx), steps(2,l_ndx), cos(steps(6,l_ndx)), sin(steps(6,l_ndx)), 'r', 'AutoScaleFactor', 0.2)
-  plot(steps(1,:), steps(2,:), 'k:')
-  for j = 1:length(stones)
-    pts = [stones(1,j) + stone_scale*[-1, -1, 1, 1];
-             stones(2,j) + stone_scale*[-1, 1, 1, -1]];
-    patch(pts(1,:), pts(2,:), 'k', 'FaceAlpha', 0.2);
-  end
-  axis equal
+figure()
+clf
+nsteps = length(plan.footsteps);
+r_ndx = 2:2:nsteps;
+l_ndx = 1:2:nsteps;
+steps = plan.step_matrix();
+k = 0.25;
+arrow_props = {'AutoScale', 'off', 'LineWidth', 2, 'MaxHeadSize', 0.8};
+quiver(steps(1,r_ndx), steps(2, r_ndx), k*cos(steps(6,r_ndx)), k*sin(steps(6,r_ndx)), 'Color', [0.2,0.8,0.2], arrow_props{:})
+hold on
+quiver(steps(1,l_ndx), steps(2,l_ndx), k*cos(steps(6,l_ndx)), k*sin(steps(6,l_ndx)), 'Color', [1, 204/255,0], arrow_props{:})
+plot(steps(1,r_ndx), steps(2,r_ndx), 'ko', 'MarkerFaceColor', [0.2,0.8,0.2], 'MarkerSize', 10)
+plot(steps(1,l_ndx), steps(2,l_ndx), 'ko', 'MarkerFaceColor', [1, 204/255,0], 'MarkerSize', 10)
+goal_pos.center = mean([goal_pos.right, goal_pos.left], 2);
+k = 0.15;
+quiver(goal_pos.center(1), goal_pos.center(2), k*cos(goal_pos.center(6)), k*sin(goal_pos.center(6)), 'Color', [0,0,0], arrow_props{:}, 'ShowArrowHead', 'off', 'Marker', 'o', 'MarkerSize', 30)
+plot(steps(1,:), steps(2,:), 'k:')
+for j = 1:length(stones)
+  pts = [stones(1,j) + stone_scale*[-1, -1, 1, 1];
+           stones(2,j) + stone_scale*[-1, 1, 1, -1]];
+  patch(pts(1,:), pts(2,:), 'k', 'FaceAlpha', 0.2);
 end
-
-figure(1)
-test_solver(@footstepMIQP);
-figure(2)
-test_solver(@footstepAlternatingMIQP);
-figure(3)
-test_solver(@footstepMISOCP);
-end
-
+axis equal
+set(gca, 'XTick', []);
+set(gca, 'YTick', []);

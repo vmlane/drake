@@ -1,61 +1,9 @@
-function [plan, sin_yaw, cos_yaw] = footstepGaitedMISOCP(robot, seed_plan, weights, goal_pos)
-
-% 
-% @param seed_plan a blank footstep plan, provinding the structure of the
-%                  desired plan. Probably generated with
-%                  FootstepPlan.blank_plan()
-% @param weights a struct with fields 'goal', 'relative', and
-%                'relative_final' describing the various contributions to
-%                the cost function. These are described in detail in
-%                Biped.getFootstepOptimizationWeights()
-% @param goal_pos a struct with fields 'right' and 'left'.
-%                 goal_pos.right is the desired 6 DOF pose
-%                 of the right foot sole, and likewise for
-%                 goal_pos.left
+function [poses] = footstepGaitedMISOCP(robot, feet_description, start_pose, goal_pose, safe_regions, nframes)
 
 checkDependency('yalmip');
 checkDependency('gurobi');
 
-SWING_SPEED = 1;
-BODY_SPEED = 0.25;
 MAX_DISTANCE = 30;
-ROTATION_RATE = 1;
-SWAY_TIME = 0.5;
-
-seed_plan.sanity_check();
-rangecheck(seed_plan.footsteps(1).pos(6), -pi, pi);
-rangecheck(seed_plan.footsteps(2).pos(6), -pi, pi);
-
-% Temporary
-assert(seed_plan.footsteps(1).frame_id == robot.foot_frame_id.right);
-
-nsteps = length(seed_plan.footsteps);
-
-walk_info = struct('feet', {{'left', 'right'}}, ...
-                  'foci', struct('right', struct('v', {[0; 0], [0; -0.25]},...
-                                             'r', {0.19, 0.16}),...
-                                 'left', struct('v', {[0; 0], [0; 0.25]},...
-                                             'r', {0.19, 0.16})),...
-                  'lin_con', struct('right', struct('A', [0,0,1,0,0,0;
-                                                      0,0,-1,0,0,0;
-                                                      0,0,0,0,0,1;
-                                                      0,0,0,0,0,-1],...
-                                                'b', [0.1;
-                                                      0.1;
-                                                      0.01;
-                                                      pi/8]),...
-                                    'left', struct('A', [0,0,1,0,0,0;
-                                                      0,0,-1,0,0,0;
-                                                      0,0,0,0,0,1;
-                                                      0,0,0,0,0,-1],...
-                                                'b', [0.1;
-                                                      0.1;
-                                                      pi/8;
-                                                      0.01])),...
-                  'gait', struct('right', {0, 1}, 'left', {1, 0}));
-
-% TODO: generalize
-nframes = nsteps;
 
 nregions = length(seed_plan.safe_regions);
 
