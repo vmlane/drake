@@ -1,6 +1,5 @@
 classdef GaitedFootstepPlanningProblem
   properties
-    robot;
     feet = {'left', 'right'};
     foci = struct('right', struct('v', {[0; 0], [0; -0.25]},...
                                              'r', {0.19, 0.16}),...
@@ -33,10 +32,6 @@ classdef GaitedFootstepPlanningProblem
   end
 
   methods
-    function obj = GaitedFootstepPlanningProblem(robot)
-      obj.robot = robot;
-    end
-
     function obj = addIRISRegions(obj, iris_regions)
       for j = 1:length(iris_regions)
         A = iris_regions(j).A;
@@ -117,7 +112,7 @@ classdef GaitedFootstepPlanningProblem
       start_fields = fieldnames(obj.start_pose)';
       for f = start_fields
         field = f{1};
-        constraints = [constraints, pose.(field)(:, 1) == obj.start_pose.(field)(POSE_INDICES)];
+        constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2)];
       end
 
       % Set up general bounds on foot poses and foot region assignments
@@ -251,7 +246,6 @@ classdef GaitedFootstepPlanningProblem
       t = [0, cumsum(dt(1:end-1))];
 
       sol = GaitedFootstepPlanningSolution();
-      sol.robot = obj.robot;
       sol.t = t;
       sol.pose = pose;
       sol.full_gait = full_gait;

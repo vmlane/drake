@@ -2,18 +2,13 @@ function plan = bipedGaitedMISOCP(robot, seed_plan, weights, goal_pos)
 % @param seed_plan a blank footstep plan, provinding the structure of the
 %                  desired plan. Probably generated with
 %                  FootstepPlan.blank_plan()
-% @param weights a struct with fields 'goal', 'relative', and
-%                'relative_final' describing the various contributions to
-%                the cost function. These are described in detail in
-%                Biped.getFootstepOptimizationWeights()
+% @param weights not used, maintained for compatibility with other planners
 % @param goal_pos a struct with fields 'right' and 'left'.
 %                 goal_pos.right is the desired 6 DOF pose
 %                 of the right foot sole, and likewise for
 %                 goal_pos.left
 
 checkDependency('yalmip');
-
-MAX_DISTANCE = 30;
 
 seed_plan.sanity_check();
 rangecheck(seed_plan.footsteps(1).pos(6), -pi, pi);
@@ -31,6 +26,6 @@ prob.goal_pose = struct('right', goal_pos.right, 'left', goal_pos.left);
 prob = prob.addIRISRegions(seed_plan.safe_regions);
 prob.nframes = nsteps;
 sol = prob.solveYalmip();
-plan = sol.getBipedFootstepPlan(seed_plan);
+plan = sol.getBipedFootstepPlan(robot, seed_plan);
 
 end

@@ -1,7 +1,7 @@
 classdef SimpleGaitVisualizer < Visualizer
   properties
     feet = {};
-    safeRegions = [];
+    safeRegions = struct('A', {}, 'b', {}, 'point', {}, 'normal', {});
     inputFrame;
   end
   
@@ -39,7 +39,7 @@ classdef SimpleGaitVisualizer < Visualizer
         % v(3) == 1/n(3) * (n' * p - (n(1:2)' * v(1:2)))
         V(3,:) = 1/(reg.normal(3)) * (reg.normal' * reg.point - (reg.normal(1:2)' * V(1:2,:)));
         
-        patch(V(1,:), V(2,:), V(3,:)-0.1, 'k', 'FaceColor', [0.8,0.8,0.8]);
+        patch(V(1,:), V(2,:), V(3,:), 'k', 'FaceColor', [0.8,0.8,0.8]);
       end
       
       scale = 0.1;

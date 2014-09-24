@@ -1,6 +1,5 @@
 classdef GaitedFootstepPlanningSolution
   properties
-    robot; 
     t;
     pose;
     full_gait;
@@ -19,18 +18,24 @@ classdef GaitedFootstepPlanningSolution
       xtraj = PPTrajectory(foh(obj.t, x));
       if nargout > 1
         v = SimpleGaitVisualizer(feet);
-        xtraj = setOutputFrame(xtraj. v.inputFrame);
+        for j = 1:length(obj.safe_regions)
+          normal = obj.safe_regions(j).eq.A(1,1:3)';
+          point = repmat(obj.safe_regions(j).eq.b / sum(normal), 3, 1);
+          assert(normal' * point == obj.safe_regions(j).eq.b);
+          v.safeRegions(j) = struct('A', obj.safe_regions(j).ineq.A, 'b', obj.safe_regions(j).ineq.b, 'point', point, 'normal', normal);
+        end
+        xtraj = setOutputFrame(xtraj, v.inputFrame);
       end
     end
 
-    function plan = getBipedFootstepPlan(obj, seed_plan)
+    function plan = getBipedFootstepPlan(obj, biped, seed_plan)
       plan = seed_plan;
       nsteps = length(plan.footsteps);
       feet = fieldnames(obj.full_gait)';
       for j = 1:nsteps
         for f = feet
           foot = f{1};
-          if plan.footsteps(j).frame_id == obj.robot.foot_frame_id.(foot)
+          if plan.footsteps(j).frame_id == biped.foot_frame_id.(foot)
             plan.footsteps(j).pos([1,2,3,6]) = obj.pose.(foot)(:,j);
             plan.footsteps(j).pos([4,5]) = 0;
             plan.region_order(j) = obj.region_assignments(j).(foot);
