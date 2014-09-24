@@ -1,5 +1,6 @@
 function testQuadrupedPlanner()
-% Use the gaited mixed-integer footstep planner to solve a quadruped planning problem
+% Use the gaited mixed-integer footstep planner to solve a quadruped planning problem. 
+
 prob = GaitedFootstepPlanningProblem();
 
 % Pre-generate some safe regions in IRIS region format

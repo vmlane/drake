@@ -1,9 +1,11 @@
-function [plan, sin_yaw, cos_yaw] = footstepMISOCP_sc(biped, seed_plan, weights, goal_pos)
+function [plan, sin_yaw, cos_yaw] = footstepMISOCPSector(biped, seed_plan, weights, goal_pos)
 % This planner is the first prototype of the mixed-integer planner
 % described in "Footstep Planning on Uneven Terrain with Mixed-Integer 
 % Convex Optimization" by Robin Deits and Russ Tedrake. 
 % 
-% Note: this is now obsolete: please use footstepMIQCQP.m instead.
+% Note: This is experimental and may be very slow in practice. It differs slightly from
+% footstepMISOCP.m in that it does not have separate binary variables for cos_sector and 
+% sin_sector.
 % 
 % This implementation uses a mixed-integer SOCP to plan the number of footsteps to take,
 % the position and yaw of those steps, and the assignments of footsteps to

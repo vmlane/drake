@@ -1,4 +1,12 @@
 classdef GaitedFootstepPlanningProblem
+  % This class represents a general category of fixed-gait footstep planning problems. A
+  % fixed-gait planning problem involves optimizing the poses of a number of "frames", each
+  % of which consists of a pose for the robot's body and all of its feet. The gait is a binary
+  % structure, which indicates whether a given foot is in contact at a given frame. Feet that
+  % are in contact may not move between frames. Additionally, we use the same convex safe
+  % region technique used in, e.g. footstepMIQP to assign foot poses to convex regions.
+  % 
+  % This class is demonstrated in bipedGaitedMISOCP.m and testQuadrupedPlanner.m
   properties
     feet = {'left', 'right'};
     foci = struct('right', struct('v', {[0; 0], [0; -0.25]},...

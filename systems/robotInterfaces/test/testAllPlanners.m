@@ -5,3 +5,4 @@ testMIQP();
 testAlternatingMIQP();
 testMISOCP();
 testGaitedMISOCP();
+testSectorMISOCP();

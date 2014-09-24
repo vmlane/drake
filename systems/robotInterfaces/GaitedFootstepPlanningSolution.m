@@ -1,4 +1,7 @@
 classdef GaitedFootstepPlanningSolution
+% This class is a helper object to hold the solution to a GaitedFootstepPlanningProblem. 
+% It allows the user to retrieve a FootstepPlan object compatible with the DRC stack or
+% to visualize the plan using a simple general-purpose Matlab visualizer. 
   properties
     t;
     pose;
@@ -9,6 +12,8 @@ classdef GaitedFootstepPlanningSolution
 
   methods
     function [xtraj, v] = getSimpleGaitTrajectory(obj)
+      % Return a trajectory of [body_pose; foot1_pose; foot2_pose; etc...] and,
+      % optionally, a visualizer to display it with.
       x = [obj.pose.body];
       feet = fieldnames(obj.full_gait)';
       for f = feet
