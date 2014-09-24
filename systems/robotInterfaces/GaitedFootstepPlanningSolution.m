@@ -23,9 +23,9 @@ classdef GaitedFootstepPlanningSolution
       end
     end
 
-    function getBipedFootstepPlan(obj, seed_plan)
+    function plan = getBipedFootstepPlan(obj, seed_plan)
       plan = seed_plan;
-      nsteps = length(plan.footstep);
+      nsteps = length(plan.footsteps);
       feet = fieldnames(obj.full_gait)';
       for j = 1:nsteps
         for f = feet
@@ -33,7 +33,7 @@ classdef GaitedFootstepPlanningSolution
           if plan.footsteps(j).frame_id == obj.robot.foot_frame_id.(foot)
             plan.footsteps(j).pos([1,2,3,6]) = obj.pose.(foot)(:,j);
             plan.footsteps(j).pos([4,5]) = 0;
-            plan.region_order(j) = obj.region_assignments(j);
+            plan.region_order(j) = obj.region_assignments(j).(foot);
           end
         end
       end

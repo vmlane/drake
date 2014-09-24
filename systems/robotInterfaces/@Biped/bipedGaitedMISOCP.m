@@ -28,8 +28,9 @@ seed_steps = [seed_plan.footsteps.pos];
 prob = GaitedFootstepPlanningProblem(robot);
 prob.start_pose = struct('right', seed_steps(:,1), 'body', mean(seed_steps(:,1:2), 2), 'left', seed_steps(:,2));
 prob.goal_pose = struct('right', goal_pos.right, 'left', goal_pos.left);
+prob = prob.addIRISRegions(seed_plan.safe_regions);
 prob.nframes = nsteps;
 sol = prob.solveYalmip();
-plan = sol.getBipedFootstepPLan(seed_plan);
+plan = sol.getBipedFootstepPlan(seed_plan);
 
 end

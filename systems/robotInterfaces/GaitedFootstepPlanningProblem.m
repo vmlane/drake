@@ -6,7 +6,22 @@ classdef GaitedFootstepPlanningProblem
                                              'r', {0.19, 0.16}),...
                                  'left', struct('v', {[0; 0], [0; 0.25]},...
                                              'r', {0.19, 0.16}));
-    body_to_feet_constraints; % currently must be linear
+    body_to_feet_constraints = struct('right', struct('A', [0,0,1,0,0,0;
+                                                      0,0,-1,0,0,0;
+                                                      0,0,0,0,0,1;
+                                                      0,0,0,0,0,-1],...
+                                                'b', [0.1;
+                                                      0.1;
+                                                      0.01;
+                                                      pi/8]),...
+                                     'left', struct('A', [0,0,1,0,0,0;
+                                                      0,0,-1,0,0,0;
+                                                      0,0,0,0,0,1;
+                                                      0,0,0,0,0,-1],...
+                                                'b', [0.1;
+                                                      0.1;
+                                                      pi/8;
+                                                      0.01])); % currently must be linear
     gait = struct('right', {0, 1}, 'left', {1, 0});
     nframes = 10; % number of frames of the gait to plan. nframes/length(gait) gives the number of complete gait cycles
     swing_speed = 1; % m/s
@@ -35,8 +50,8 @@ classdef GaitedFootstepPlanningProblem
         outframe = drakeFunction.frames.realCoordinateSpace(n);
         obj.safe_regions(end+1).ineq = drakeFunction.Affine(inframe, outframe, A, b);
 
-        A = [point', zeros(1, 3)];
-        b = point' * normal;
+        A = [normal', zeros(1, 3)];
+        b = normal' * point;
         outframe = drakeFunction.frames.realCoordinateSpace(1);
         obj.safe_regions(end).eq = drakeFunction.Affine(inframe, outframe, A, b);
       end
@@ -44,7 +59,7 @@ classdef GaitedFootstepPlanningProblem
 
 
     function sol = solveYalmip(obj)
-      if isempty(start_pose) || isempty(goal_pose)
+      if isempty(obj.start_pose) || isempty(obj.goal_pose)
         error('start_pose and goal_pose should be set before solving');
       end
       checkDependency('yalmip');
@@ -59,9 +74,10 @@ classdef GaitedFootstepPlanningProblem
       nregions = length(obj.safe_regions);
       pose = struct();
       pose.body = sdpvar(4, obj.nframes, 'full');
+      region = struct();
       for f = obj.feet
         foot = f{1};
-        pos.(foot) = sdpvar(4, obj.nframes, 'full');
+        pose.(foot) = sdpvar(4, obj.nframes, 'full');
         if nregions > 0
           region.(foot) = binvar(nregions, obj.nframes, 'full');
         end
@@ -76,11 +92,11 @@ classdef GaitedFootstepPlanningProblem
       angle_boundaries = (-pi-pi/8):(pi/4):(pi-pi/8);
       yaw_sector = binvar(length(angle_boundaries) - 1, obj.nframes, 'full');
 
-      min_yaw = obj.start_pose.(body)(6) - pi;
-      max_yaw = obj.start_pose.(body)(6) + pi;
+      min_yaw = obj.start_pose.body(6) - pi;
+      max_yaw = obj.start_pose.body(6) + pi;
 
       % Replicate the gait (so we can hand it back as an output)
-      full_gait = repmat(obj.gait, 1, ceil(length(obj.gait) / obj.nframes));
+      full_gait = repmat(obj.gait, 1, ceil(obj.nframes / length(obj.gait)));
       full_gait = full_gait(1:obj.nframes);
 
 
@@ -134,7 +150,7 @@ classdef GaitedFootstepPlanningProblem
           end
           
           if nregions > 0
-            if j > length(obj.gait) || any(~full_gait.(foot)(1:j)) % If the foot has been allowed to move yet
+            if j > length(obj.gait) || any(~[full_gait(1:j).(foot)]) % If the foot has been allowed to move yet
               for r = 1:nregions
                 Ar_ineq = obj.safe_regions(r).ineq.A(:,POSE_INDICES);
                 br_ineq = obj.safe_regions(r).ineq.b;
@@ -142,7 +158,7 @@ classdef GaitedFootstepPlanningProblem
                 br_eq = obj.safe_regions(r).eq.b;
                 constraints = [constraints,...
                   implies(region.(foot)(r,j), Ar_ineq * pose.(foot)(:,j) <= br_ineq),...
-                  implies(region.(foot)(r,j), Ar_eq * pose.(foot) == br_eq),...
+                  implies(region.(foot)(r,j), Ar_eq * pose.(foot)(:,j) == br_eq),...
                   ];
               end
             end
@@ -151,11 +167,13 @@ classdef GaitedFootstepPlanningProblem
           if j < obj.nframes
             % enforce gait and swing speed
             if full_gait(j).(foot)
-              constraints = [constraints, pose.(foot)(:,j) == pose.(foot)(:,j+1),...
-                             region.(foot)(:,j) == region.(foot)(:,j+1)];
+              constraints = [constraints, pose.(foot)(:,j) == pose.(foot)(:,j+1)];
+              if nregions > 0
+                constraints = [constraints, region.(foot)(:,j) == region.(foot)(:,j+1)];
+              end
             else
               constraints = [constraints, ...
-                  abs(pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j)) <= dt(j) * SWING_SPEED,...
+                  abs(pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j)) <= dt(j) * obj.swing_speed,...
       %           cone(pos.(foot)(1:2,j+1) - pos.(foot)(1:2,j), (dt(j)) * SWING_SPEED),...
                   ];
             end
@@ -163,8 +181,8 @@ classdef GaitedFootstepPlanningProblem
         end
         if j < obj.nframes
           constraints = [constraints,...
-                         abs(pose.body(4,j+1) - pose.body(4,j)) <= dt(j) * ROTATION_RATE,...
-                        cone(pose.body(1:2,j+1) - pose.body(1:2,j), dt(j) * BODY_SPEED),...
+                         abs(pose.body(4,j+1) - pose.body(4,j)) <= dt(j) * obj.yaw_speed,...
+                        cone(pose.body(1:2,j+1) - pose.body(1:2,j), dt(j) * obj.body_speed),...
                          ];
         end
         
@@ -223,7 +241,9 @@ classdef GaitedFootstepPlanningProblem
         foot = f{1};
         region.(foot) = logical(round(double(region.(foot))));
         for j = 1:obj.nframes
-          region_assignments.(foot)(j) = r;
+          r = find(region.(foot)(:,j));
+          assert(length(r) == 1);
+          region_assignments(j).(foot) = r;
         end
       end
 
@@ -231,7 +251,7 @@ classdef GaitedFootstepPlanningProblem
       t = [0, cumsum(dt(1:end-1))];
 
       sol = GaitedFootstepPlanningSolution();
-      sol.robot = robot;
+      sol.robot = obj.robot;
       sol.t = t;
       sol.pose = pose;
       sol.full_gait = full_gait;
