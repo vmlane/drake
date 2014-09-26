@@ -2,7 +2,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
   properties
     dt = 0.25;
     g = 9.81; % accel due to gravity (m/s^2)
-    foot_force = 55; % N = kg m/s^2
+    foot_force = 25; % N = kg m/s^2
     body_mass = 5; % kg
   end
 
@@ -70,7 +70,9 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       start_fields = fieldnames(obj.start_pose)';
       for f = start_fields
         field = f{1};
-        constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2)];
+        constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2),...
+          gait_sum(1) == length(obj.feet),...
+          ];
       end
 
       % Set up general bounds on foot poses and foot region assignments
@@ -103,45 +105,40 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           if j < obj.nframes
             % Enforce ballistic dynamics
             constraints = [constraints, pose.body(1:3,j+1) - pose.body(1:3,j) == velocity.body(1:3,j),...
-                           velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt + [0; 0; -obj.g * obj.dt]];
+                           velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt + [0; 0; -obj.g * obj.dt],...
+                           cone(velocity.body(1:3,j), obj.body_speed),...
+                           ];
             % Enforce bounded impulse from each foot
             constraints = [constraints, cone(acceleration.body(1:3,j), gait_sum(j) * obj.foot_force / obj.body_mass)];
           end 
           
           if nregions > 0
-            if j > length(obj.gait) || any(~[full_gait(1:j).(foot)]) % If the foot has been allowed to move yet
-              for r = 1:nregions
-                Ar_ineq = obj.safe_regions(r).ineq.A(:,POSE_INDICES);
-                br_ineq = obj.safe_regions(r).ineq.b;
-                Ar_eq = obj.safe_regions(r).eq.A(:,POSE_INDICES);
-                br_eq = obj.safe_regions(r).eq.b;
-                constraints = [constraints,...
-                  implies(region.(foot)(r,j), Ar_ineq * pose.(foot)(:,j) <= br_ineq),...
-                  implies(region.(foot)(r,j), Ar_eq * pose.(foot)(:,j) == br_eq),...
-                  ];
-              end
+            for r = 1:nregions
+              Ar_ineq = obj.safe_regions(r).ineq.A(:,POSE_INDICES);
+              br_ineq = obj.safe_regions(r).ineq.b;
+              Ar_eq = obj.safe_regions(r).eq.A(:,POSE_INDICES);
+              br_eq = obj.safe_regions(r).eq.b;
+              constraints = [constraints,...
+                implies(region.(foot)(r,j), Ar_ineq * pose.(foot)(:,j) <= br_ineq),...
+                implies(region.(foot)(r,j), Ar_eq * pose.(foot)(:,j) == br_eq),...
+                ];
             end
           end
           
           if j < obj.nframes
             % enforce gait and swing speed
-            if full_gait(j).(foot)
-              constraints = [constraints, pose.(foot)(:,j) == pose.(foot)(:,j+1)];
-              if nregions > 0
-                constraints = [constraints, region.(foot)(:,j) == region.(foot)(:,j+1)];
-              end
-            else
-              constraints = [constraints, ...
-                  abs(pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j)) <= dt(j) * obj.swing_speed,...
-      %           cone(pos.(foot)(1:2,j+1) - pos.(foot)(1:2,j), (dt(j)) * SWING_SPEED),...
-                  ];
-            end
+            constraints = [constraints,...
+              implies(gait.(foot)(j), pose.(foot)(:,j) == pose.(foot)(:,j+1)),...
+              cone(velocity.body(1:3,j) - (pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)), obj.dt * obj.swing_speed)];
+
+            % if nregions > 0
+            %   constraints = [constraints, implies(gait.(foot)(j), region.(foot)(:,j) == region.(foot)(:,j+1))];
+            % end
           end
         end
         if j < obj.nframes
           constraints = [constraints,...
-                         abs(pose.body(4,j+1) - pose.body(4,j)) <= dt(j) * obj.yaw_speed,...
-                        cone(pose.body(1:2,j+1) - pose.body(1:2,j), dt(j) * obj.body_speed),...
+                         abs(pose.body(4,j+1) - pose.body(4,j)) <= obj.dt * obj.yaw_speed,...
                          ];
         end
         
@@ -168,3 +165,63 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         end
       end
 
+      objective = 0;
+      w_goal = diag([100,100,100,100]);
+
+      fnames = fieldnames(obj.goal_pose)';
+      for f = fnames
+        field = f{1};
+        objective = objective + (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES))' * w_goal * (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES));
+      end
+      for j = 1:obj.nframes
+        for f = obj.feet
+          foot = f{1};
+          objective = objective + (pose.(foot)(:,j) - pose.body(:,j))' * (pose.(foot)(:,j) - pose.body(:,j));
+          if j < obj.nframes
+            objective = objective + (pose.(foot)(:,j+1) - pose.(foot)(:,j))' * (pose.(foot)(:,j+1) - pose.(foot)(:,j));
+          end
+        end
+      end
+
+      optimize(constraints, objective, sdpsettings('solver', 'gurobi'));
+
+      % Extract the result
+      fnames = fieldnames(pose)';
+      for f = fnames
+        field = f{1};
+        pose.(field) = double(pose.(field));
+      end
+      region_assignments = struct();
+
+      for f = obj.feet
+        foot = f{1};
+        region.(foot) = logical(round(double(region.(foot))));
+        gait.(foot) = logical(round(double(gait.(foot))));
+        for j = 1:obj.nframes
+          r = find(region.(foot)(:,j));
+          assert(length(r) <= 1);
+          region_assignments(j).(foot) = r;
+        end
+      end
+
+      t = 0:obj.dt:((obj.nframes - 1) * obj.dt);
+
+      sol = GaitedFootstepPlanningSolution();
+      sol.t = t;
+      sol.pose = pose;
+      sol.full_gait = gait;
+      sol.safe_regions = obj.safe_regions;
+      sol.region_assignments = region_assignments;
+
+      figure(5)
+      clf
+      hold on
+      subplot(311)
+      plot(t, double(acceleration.body(3,:)));
+      subplot(312)
+      plot(t, double(velocity.body(3,:)));
+      subplot(313)
+      plot(t, double(pose.body(3,:)));
+    end
+  end
+end

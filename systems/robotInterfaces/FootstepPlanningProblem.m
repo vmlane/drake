@@ -42,7 +42,6 @@ classdef FootstepPlanningProblem
 
         A = [normal', zeros(1, 3)];
         b = normal' * point;
-        obj.safe_regions(end).eq = drakeFunction.Affine(inframe, outframe, A, b);
         obj.safe_regions(end).eq = struct('A', A, 'b', b);
       end
     end
