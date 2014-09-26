@@ -2,7 +2,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
   properties
     dt = 0.25;
     g = 9.81; % accel due to gravity (m/s^2)
-    foot_force = 25; % N = kg m/s^2
+    foot_force = 60; % N = kg m/s^2
     body_mass = 5; % kg
   end
 
@@ -176,9 +176,11 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       for j = 1:obj.nframes
         for f = obj.feet
           foot = f{1};
-          objective = objective + (pose.(foot)(:,j) - pose.body(:,j))' * (pose.(foot)(:,j) - pose.body(:,j));
+          % objective = objective + (pose.(foot)(1:2,j) - pose.body(1:2,j))' * (pose.(foot)(1:2,j) - pose.body(1:2,j));
           if j < obj.nframes
-            objective = objective + (pose.(foot)(:,j+1) - pose.(foot)(:,j))' * (pose.(foot)(:,j+1) - pose.(foot)(:,j));
+            objective = objective + norm((pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)) - velocity.body(1:3,j));
+            objective = objective + norm(acceleration.body(1:3,j) - [0;0;9.8]);
+            % objective = objective + (pose.(foot)(:,j+1) - pose.(foot)(:,j))' * (pose.(foot)(:,j+1) - pose.(foot)(:,j));
           end
         end
       end
