@@ -8,6 +8,8 @@ classdef SimpleGaitVisualizer < Visualizer
     feet = {};
     safeRegions = struct('A', {}, 'b', {}, 'point', {}, 'normal', {});
     inputFrame;
+    leg_plot_handles = [];
+    has_drawn_regions = false;
   end
   
   methods
@@ -21,19 +23,21 @@ classdef SimpleGaitVisualizer < Visualizer
       obj = obj@Visualizer(inputFrame);
       obj.inputFrame = inputFrame;
       obj.feet = feet;
+      obj.fignum = 25;
     end
-    
-    function draw(obj, t, x)
-      persistent hFig;
-      
-      if isempty(hFig)
-        hFig = figure(25);
-        set(hFig,'DoubleBuffer', 'on');
+
+    function drawWrapper(obj,t,y)
+      sfigure(obj.fignum);
+      draw(obj,t,y);
+      if (obj.display_time)
+        title(['t = ', num2str(t,'%.2f') ' sec']);
       end
-      
-      figure(25); 
+      drawnow;
+    end
+
+    function drawRegions(obj)
+      sfigure(obj.fignum);
       cla; hold on;
-      
       for j = 1:length(obj.safeRegions)
         reg = obj.safeRegions(j);
         V = iris.thirdParty.polytopes.lcon2vert(reg.A(:,1:2), reg.b);
@@ -44,29 +48,46 @@ classdef SimpleGaitVisualizer < Visualizer
         
         patch(V(1,:), V(2,:), V(3,:), 'k', 'FaceColor', [0.8,0.8,0.8]);
       end
+      obj.has_drawn_regions = true;
+    end
+    
+    function draw(obj, t, x)
+      if ~obj.has_drawn_regions
+        obj.drawRegions();
+      end
+
+      [az, el] = view();
       
       scale = 0.1;
       p = Point(obj.inputFrame, x);
       plot3(p.body_x, p.body_y, p.body_z, 'ko');
       quiver3(p.body_x, p.body_y, p.body_z, scale * cos(p.body_yaw), scale * sin(p.body_yaw), 0, 'k', 'AutoScale', 'off');
       
-      for f = obj.feet
-        foot = f{1};
+      for j = 1:length(obj.feet)
+        foot = obj.feet{j};
         if p.([foot, '_in_contact'])
           color = 'r';
         else
           color = 'k';
         end
-        plot3([p.body_x, p.([foot, '_x'])],...
-              [p.body_y, p.([foot, '_y'])],...
-              [p.body_z, p.([foot, '_z'])], 'k-', 'LineWidth', 3, 'Color', color);
-        quiver3(p.([foot, '_x']), p.([foot, '_y']), p.([foot, '_z']),...
-                scale * cos(p.([foot, '_yaw'])), scale * sin(p.([foot, '_yaw'])), 0,...
-                'r', 'AutoScale', 'off')
+        if j > length(obj.leg_plot_handles)
+          obj.leg_plot_handles(j) = ...
+            plot3([p.body_x, p.([foot, '_x'])],...
+                  [p.body_y, p.([foot, '_y'])],...
+                  [p.body_z, p.([foot, '_z'])], 'k-', 'LineWidth', 3, 'Color', color);
+        else
+          set(obj.leg_plot_handles(j), 'XData', [p.body_x, p.([foot, '_x'])]);
+          set(obj.leg_plot_handles(j), 'YData', [p.body_y, p.([foot, '_y'])]);
+          set(obj.leg_plot_handles(j), 'ZData', [p.body_z, p.([foot, '_z'])]);
+        end
+
+        % quiver3(p.([foot, '_x']), p.([foot, '_y']), p.([foot, '_z']),...
+        %         scale * cos(p.([foot, '_yaw'])), scale * sin(p.([foot, '_yaw'])), 0,...
+        %         'r', 'AutoScale', 'off')
       end
       axis equal
-      view(-140,44);
-      drawnow();
+      view(az, el);
+      % view(-140,44);
     end
   end
 end
