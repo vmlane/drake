@@ -15,9 +15,9 @@ classdef SimpleGaitVisualizer < Visualizer
       coords = {'body_x', 'body_y', 'body_z', 'body_yaw'};
       for f = feet
         foot = f{1};
-        coords = [coords, [foot, '_x'], [foot, '_y'], [foot, '_z'], [foot, '_yaw']];
+        coords = [coords, [foot, '_in_contact'], [foot, '_x'], [foot, '_y'], [foot, '_z'], [foot, '_yaw']];
       end
-      inputFrame = CoordinateFrame('SimpleGaitVisualizerInput', 4 + 4 * length(feet), 'x', coords);
+      inputFrame = CoordinateFrame('SimpleGaitVisualizerInput', 4 + 5 * length(feet), 'x', coords);
       obj = obj@Visualizer(inputFrame);
       obj.inputFrame = inputFrame;
       obj.feet = feet;
@@ -52,9 +52,14 @@ classdef SimpleGaitVisualizer < Visualizer
       
       for f = obj.feet
         foot = f{1};
+        if p.([foot, '_in_contact'])
+          color = 'r';
+        else
+          color = 'k';
+        end
         plot3([p.body_x, p.([foot, '_x'])],...
               [p.body_y, p.([foot, '_y'])],...
-              [p.body_z, p.([foot, '_z'])], 'k-', 'LineWidth', 3);
+              [p.body_z, p.([foot, '_z'])], 'k-', 'LineWidth', 3, 'Color', color);
         quiver3(p.([foot, '_x']), p.([foot, '_y']), p.([foot, '_z']),...
                 scale * cos(p.([foot, '_yaw'])), scale * sin(p.([foot, '_yaw'])), 0,...
                 'r', 'AutoScale', 'off')
