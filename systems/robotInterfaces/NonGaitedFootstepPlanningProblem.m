@@ -2,8 +2,9 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
   properties
     dt = 0.25;
     g = 9.81; % accel due to gravity (m/s^2)
-    foot_force = 60; % N = kg m/s^2
+    foot_force = [60, 60, 90, 90]; % N = kg m/s^2
     body_mass = 5; % kg
+    nominal_com_height = 0.2; % m
   end
 
   methods
@@ -30,15 +31,20 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       region = struct();
       gait = struct();
       gait_sum = zeros(1, obj.nframes);
-      for f = obj.feet
-        foot = f{1};
+      total_gait_force = zeros(1, obj.nframes);
+      mean_foot_pose = zeros(2, obj.nframes);
+      for j = 1:length(obj.feet)
+        foot = obj.feet{j};
         pose.(foot) = sdpvar(4, obj.nframes, 'full');
+        mean_foot_pose = mean_foot_pose + obj.foot_force(j) * pose.(foot)(1:2,:);
         gait.(foot) = binvar(1, obj.nframes, 'full');
+        total_gait_force = total_gait_force + obj.foot_force(j) * gait.(foot);
         gait_sum = gait_sum + gait.(foot);
         if nregions > 0
           region.(foot) = binvar(nregions, obj.nframes, 'full');
         end
       end
+      mean_foot_pose = mean_foot_pose / sum(obj.foot_force);
 
       body_yaw = pose.body(4,:);
       cos_yaw = sdpvar(1, obj.nframes, 'full');
@@ -75,6 +81,10 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           ];
       end
 
+      % Constrain the final conditions
+      constraints = [constraints,...
+        gait_sum(end) == length(obj.feet)];
+
       % Set up general bounds on foot poses and foot region assignments
       for f = obj.feet
         foot = f{1};
@@ -106,10 +116,15 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
             % Enforce ballistic dynamics
             constraints = [constraints, pose.body(1:3,j+1) - pose.body(1:3,j) == velocity.body(1:3,j),...
                            velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt + [0; 0; -obj.g * obj.dt],...
-                           cone(velocity.body(1:3,j), obj.body_speed),...
+                           % cone(velocity.body(1:3,j), obj.body_speed),...
                            ];
             % Enforce bounded impulse from each foot
-            constraints = [constraints, cone(acceleration.body(1:3,j), gait_sum(j) * obj.foot_force / obj.body_mass)];
+            constraints = [constraints, ...
+              0 <= acceleration.body(3,j) <= total_gait_force(j) / obj.body_mass,...
+              % acceleration.body(1:2,j) == (obj.g / obj.nominal_com_height) * (pose.body(1:2,j) - mean_foot_pose(1:2,j)),...
+              ];
+
+            constraints = [constraints, cone(acceleration.body(1:3,j), gait_sum(j) * mean(obj.foot_force) / obj.body_mass)];
           end 
           
           if nregions > 0
@@ -129,8 +144,9 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
             % enforce gait and swing speed
             constraints = [constraints,...
               implies(gait.(foot)(j), pose.(foot)(:,j) == pose.(foot)(:,j+1)),...
-              cone(velocity.body(1:3,j) - (pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)), obj.dt * obj.swing_speed)];
-
+              % implies(~gait.(foot)(j), abs(pose.(foot)(:,j) - pose.body(:,j)) <= 0.1),...
+              cone((pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)) - velocity.body(1:3,j), obj.dt * obj.swing_speed),...
+              ];
             % if nregions > 0
             %   constraints = [constraints, implies(gait.(foot)(j), region.(foot)(:,j) == region.(foot)(:,j+1))];
             % end
@@ -179,7 +195,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           % objective = objective + (pose.(foot)(1:2,j) - pose.body(1:2,j))' * (pose.(foot)(1:2,j) - pose.body(1:2,j));
           if j < obj.nframes
             objective = objective + norm((pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)) - velocity.body(1:3,j));
-            objective = objective + norm(acceleration.body(1:3,j) - [0;0;9.8]);
+            objective = objective + norm(acceleration.body(1:3,j));
             % objective = objective + (pose.(foot)(:,j+1) - pose.(foot)(:,j))' * (pose.(foot)(:,j+1) - pose.(foot)(:,j));
           end
         end
