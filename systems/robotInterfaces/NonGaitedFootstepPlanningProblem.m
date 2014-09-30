@@ -3,7 +3,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
     dt = 0.25;
     g = 9.81; % accel due to gravity (m/s^2)
     % foot_force = [60, 60, 90, 90]; % N = kg m/s^2
-    foot_force = 20;
+    foot_force = 30;
     body_mass = 5; % kg
     nominal_com_height = 0.2; % m
   end
@@ -31,16 +31,17 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
 
       region = struct();
       gait = struct();
-      gait_sum = zeros(1, obj.nframes);
       angular_momentum = struct();
       angular_momentum.body = sdpvar(2, obj.nframes, 'full');
+      contact_force = struct('total', 0);
       for j = 1:length(obj.feet)
         foot = obj.feet{j};
         pose.(foot) = sdpvar(4, obj.nframes, 'full');
         gait.(foot) = binvar(1, obj.nframes, 'full');
-        gait_sum = gait_sum + gait.(foot);
+        contact_force.(foot) = sdpvar(3, obj.nframes, 'full');
+        contact_force.total = contact_force.total + contact_force.(foot);
         foot_nominal_pose = [mean([obj.foci.(foot).v], 2); 0];
-        angular_momentum.(foot) = cross(foot_nominal_pose, obj.foot_force * [0;0;1]);
+        angular_momentum.(foot) = cross(foot_nominal_pose, [0;0;1]);
         angular_momentum.(foot) = angular_momentum.(foot)(1:2);
         if nregions > 0
           region.(foot) = binvar(nregions, obj.nframes, 'full');
@@ -81,16 +82,24 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2),...
         ];
       end
+
+      for f = obj.feet
+        foot = f{1};
+      % Feet on the ground at the start and end
+        constraints = [constraints, gait.(foot)([1, end]) == 1];
+        % complementarity conditions
+        constraints = [constraints,...
+          -obj.foot_force * gait.(foot) <= contact_force.(foot)(1,:) <= obj.foot_force * gait.(foot),...
+          -obj.foot_force * gait.(foot) <= contact_force.(foot)(2,:) <= obj.foot_force * gait.(foot),...
+          -obj.foot_force * gait.(foot) <= contact_force.(foot)(3,:) <= obj.foot_force * gait.(foot),...
+          ];
+      end
+
       constraints = [constraints,...
-          gait_sum(1) == length(obj.feet),...
           angular_momentum.body(:,1) == 0,...
           angular_momentum.body(:,end) == 0,...
-          abs(angular_momentum.body) <= 13,...
+          abs(angular_momentum.body) <= 7,...
           ];
-
-      % Constrain the final conditions
-      constraints = [constraints,...
-        gait_sum(end) == length(obj.feet)];
 
       % Set up general bounds on foot poses and foot region assignments
       for f = obj.feet
@@ -102,33 +111,24 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           min_yaw <= pose.(foot)(4,:) <= max_yaw,...
           ];
         if nregions > 0
-          constraints = [constraints, sum(region.(foot), 1) == gait.(foot)];
+          constraints = [constraints, sum(region.(foot), 1) >= gait.(foot)];
         end
       end
 
       for j = 1:obj.nframes
         if j < obj.nframes
           % Enforce ballistic dynamics
-          constraints = [constraints, pose.body(1:3,j+1) - pose.body(1:3,j) == velocity.body(1:3,j),...
-                         velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt + [0; 0; -obj.g * obj.dt],...
-                         % cone(velocity.body(1:3,j), obj.body_speed),...
-                         ];
-          % Enforce bounded impulse from each foot
           constraints = [constraints, ...
-            0 <= acceleration.body(3,j) <= gait_sum(j) * obj.foot_force / obj.body_mass,...
-            % acceleration.body(1:2,j) == (obj.g / obj.nominal_com_height) * (pose.body(1:2,j) - mean_foot_pose(1:2,j)),...
-            ];
-
-          constraints = [constraints, cone(acceleration.body(1:3,j), gait_sum(j) * obj.foot_force / obj.body_mass)];
-
-          % Enforce approximate angular momentum
-          % TODO: require delta angular momentum to be in the convex hull of the active angular momenta?
+                         pose.body(1:3,j+1) == pose.body(1:3,j) + velocity.body(1:3,j) * obj.dt + 0.5 * acceleration.body(1:3,j)  * obj.dt^2,...
+                         velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt,...
+                         acceleration.body(1:3,j) == contact_force.total(1:3,j)/obj.body_mass + [0;0;-obj.g],...
+                         ];
 
           new_momentum = angular_momentum.body(:,j);
 
           for f = obj.feet
             foot = f{1};
-            new_momentum = new_momentum + angular_momentum.(foot) * gait.(foot)(j);
+            new_momentum = new_momentum + angular_momentum.(foot) * contact_force.(foot)(3,j);
           end
           constraints = [constraints, ...
             angular_momentum.body(:,j+1) == new_momentum,...
@@ -151,7 +151,6 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           k = tan((th1 - th0)/2) / ((th1 - th0) / 2);
           constraints = [constraints,...
                          implies(yaw_sector(s,j), th0 <= body_yaw(j) <= th1)...
-                         % implies(yaw_sector(s,j), [ct; st]' * [cos_yaw(j); sin_yaw(j)] == 1),...
                          implies(yaw_sector(s,j), [cos_yaw(j); sin_yaw(j)] == [ct; st] + (body_yaw(j) - th) * k * [-st; ct])];
           if j < obj.nframes
             constraints = [constraints,...
@@ -167,12 +166,18 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         for f = obj.feet
           foot = f{1};
           
+          % Enforce friction cone (sort of)
+          constraints = [constraints,...
+            0 <= contact_force.(foot)(3,j),...
+            ];
+
           % Enforce reachability
           constraints = [constraints,...
             obj.body_to_feet_constraints.(foot).A(:,POSE_INDICES) * (pose.(foot)(:,j) - pose.body(:,j)) <= obj.body_to_feet_constraints.(foot).b];
           for k = 1:length(obj.foci.(foot))
             c = obj.foci.(foot)(k);
-            constraints = [constraints, cone(pose.(foot)(1:2,j) - (pose.body(1:2,j) + [cos_yaw(j), -sin_yaw(j); sin_yaw(j), cos_yaw(j)] * c.v), c.r)];
+            constraints = [constraints, ...
+              obj.pcone(pose.(foot)(1:2,j) - (pose.body(1:2,j) + [cos_yaw(j), -sin_yaw(j); sin_yaw(j), cos_yaw(j)] * c.v), c.r, 8)];
           end
 
           % Enforce region membership
@@ -193,11 +198,9 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
             % enforce gait and swing speed
             constraints = [constraints,...
               implies(gait.(foot)(j), pose.(foot)(:,j) == pose.(foot)(:,j+1)),...
-              cone((pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)) - velocity.body(1:3,j), obj.dt * obj.swing_speed),...
+              implies(gait.(foot)(j), region.(foot)(:,j) == region.(foot)(:,j+1)),...
+              % obj.pcone((pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j)) - velocity.body(1:2,j), obj.dt * obj.swing_speed + MAX_DISTANCE * gait.(foot)(j), 8),...
               ];
-            % if nregions > 0
-            %   constraints = [constraints, implies(gait.(foot)(j), region.(foot)(:,j) == region.(foot)(:,j+1))];
-            % end
           end
         end
       end
@@ -210,17 +213,12 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         field = f{1};
         objective = objective + (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES))' * w_goal * (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES));
       end
-      for j = 1:obj.nframes
-        objective = objective + norm(acceleration.body(1:3,j))^2;
-        for f = obj.feet
-          foot = f{1};
-          if j < obj.nframes
-            % objective = objective + norm((pose.(foot)(1:3,j+1) - pose.(foot)(1:3,j)) - velocity.body(1:3,j))^2;
-          end
-        end
+      for f = obj.feet
+        foot = f{1};
+        objective = objective + 0.05 * sum(sum(contact_force.(foot).^2,1));
       end
 
-      optimize(constraints, objective, sdpsettings('solver', 'mosek'));
+      optimize(constraints, objective, sdpsettings('solver', 'gurobi'));
 
       % Extract the result
       fnames = fieldnames(pose)';
@@ -260,6 +258,40 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       subplot(313)
       plot(t, double(pose.body(3,:)));
 
+      figure(6);
+      clf
+      hold on
+      subplot(221)
+      plot(t, double(sqrt(sum(contact_force.lf.^2 ,1))));
+      title('lf')
+      subplot(222)
+      plot(t, double(sqrt(sum(contact_force.rf.^2 ,1))));
+      title('rf')
+      subplot(223)
+      plot(t, double(sqrt(sum(contact_force.lh.^2 ,1))));
+      title('lh')
+      subplot(224)
+      plot(t, double(sqrt(sum(contact_force.rh.^2 ,1))));
+      title('rh')
+
     end
+  end
+  methods(Static)
+    function constraint = pcone(v, r, num_pieces)
+      % Polynomial approximation of a conic constraint norm(v) <= r
+      A = zeros(num_pieces, 2);
+      b = repmat(r, num_pieces, 1);
+      ths = linspace(0, 2*pi, num_pieces);
+      for j = 1:num_pieces
+        th = ths(j);
+        c = cos(th);
+        s = sin(th);
+        R = [c, -s; s, c];
+        A(j,:) = (R * [1;0])';
+      end
+      constraint = A * v <= b;
+    end
+        
+
   end
 end

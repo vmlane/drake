@@ -70,7 +70,7 @@ prob.start_pose = struct('body', [0;0;1.2;0;0;0],...
                          'rh', [-0.1;-0.05;0;0;0;0],...
                          'lh', [-0.1;0.05;0;0;0;0]);
 prob.goal_pose = struct('body', [2;0;0.2;0;0;0]);
-
+prob.swing_speed = 1;
 
 sol = prob.solveYalmip();
 % save('sol.mat', 'sol');
