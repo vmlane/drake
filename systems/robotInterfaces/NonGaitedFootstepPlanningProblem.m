@@ -6,6 +6,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
     foot_force = 30;
     body_mass = 5; % kg
     nominal_com_height = 0.2; % m
+    max_angular_momentum = 0; 
   end
 
   methods
@@ -34,10 +35,12 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       angular_momentum = struct();
       angular_momentum.body = sdpvar(2, obj.nframes, 'full');
       contact_force = struct('total', 0);
+      gait_sum = zeros(1, obj.nframes);
       for j = 1:length(obj.feet)
         foot = obj.feet{j};
         pose.(foot) = sdpvar(4, obj.nframes, 'full');
         gait.(foot) = binvar(1, obj.nframes, 'full');
+        gait_sum = gait_sum + gait.(foot);
         contact_force.(foot) = sdpvar(3, obj.nframes, 'full');
         contact_force.total = contact_force.total + contact_force.(foot);
         foot_nominal_pose = [mean([obj.foci.(foot).v], 2); 0];
@@ -69,6 +72,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         -1 <= sin_yaw <= 1,...
         -1 <= cos_yaw <= 1,...
         yaw_sector(5,:) == 1,... % Disable yaw
+        % gait_sum >= 1,...
         ];
 
       % Require the final velocity to be zero in the z direction (to avoid the solution where
@@ -80,6 +84,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       for f = start_fields
         field = f{1};
         constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2),...
+          velocity.body(:,1) == 0,...
         ];
       end
 
@@ -92,13 +97,14 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           -obj.foot_force * gait.(foot) <= contact_force.(foot)(1,:) <= obj.foot_force * gait.(foot),...
           -obj.foot_force * gait.(foot) <= contact_force.(foot)(2,:) <= obj.foot_force * gait.(foot),...
           -obj.foot_force * gait.(foot) <= contact_force.(foot)(3,:) <= obj.foot_force * gait.(foot),...
+          gait.(foot)(1:2:end) == gait.(foot)(2:2:end),...
           ];
       end
 
       constraints = [constraints,...
           angular_momentum.body(:,1) == 0,...
           angular_momentum.body(:,end) == 0,...
-          abs(angular_momentum.body) <= 7,...
+          abs(angular_momentum.body) <= obj.max_angular_momentum,...
           ];
 
       % Set up general bounds on foot poses and foot region assignments
@@ -119,7 +125,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         if j < obj.nframes
           % Enforce ballistic dynamics
           constraints = [constraints, ...
-                         pose.body(1:3,j+1) == pose.body(1:3,j) + velocity.body(1:3,j) * obj.dt + 0.5 * acceleration.body(1:3,j)  * obj.dt^2,...
+                         pose.body(1:3,j+1) == pose.body(1:3,j) + velocity.body(1:3,j) * obj.dt,...
                          velocity.body(1:3,j+1) == velocity.body(1:3,j) + acceleration.body(1:3,j) * obj.dt,...
                          acceleration.body(1:3,j) == contact_force.total(1:3,j)/obj.body_mass + [0;0;-obj.g],...
                          ];
@@ -206,12 +212,15 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       end
 
       objective = 0;
-      w_goal = diag([100,100,100,100]);
 
       fnames = fieldnames(obj.goal_pose)';
       for f = fnames
         field = f{1};
-        objective = objective + (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES))' * w_goal * (pose.(field)(:,end) - obj.goal_pose.(field)(POSE_INDICES));
+        for k = 1:length(POSE_INDICES)
+          if ~isnan(obj.goal_pose.(field)(POSE_INDICES(k)))
+            constraints = [constraints, pose.(field)(k,end) == obj.goal_pose.(field)(POSE_INDICES(k))];
+          end
+        end
       end
       for f = obj.feet
         foot = f{1};
@@ -272,6 +281,22 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       title('lh')
       subplot(224)
       plot(t, double(sqrt(sum(contact_force.rh.^2 ,1))));
+      title('rh')
+
+      figure(7);
+      clf
+      hold on
+      subplot(221)
+      plot(t, double(contact_force.lf(3,:)));
+      title('lf')
+      subplot(222)
+      plot(t, double(contact_force.rf(3,:)));
+      title('rf')
+      subplot(223)
+      plot(t, double(contact_force.lh(3,:)));
+      title('lh')
+      subplot(224)
+      plot(t, double(contact_force.rh(3,:)));
       title('rh')
 
     end
