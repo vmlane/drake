@@ -71,39 +71,50 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         sum(yaw_sector, 1) == 1,...
         -1 <= sin_yaw <= 1,...
         -1 <= cos_yaw <= 1,...
-        % yaw_sector(5,:) == 1,... % Disable yaw
-        % gait_sum >= 1,...
+        yaw_sector(5,:) == 1,... % Disable yaw
         ];
 
-      % Require the final velocity to be zero in the z direction (to avoid the solution where
+      % Require the final velocity to be zero (to avoid the solution where
       % we just plummet through the ground forever). 
-      constraints = [constraints, velocity.body(3,end) == 0];
+      % constraints = [constraints, velocity.body(3,end) == 0];
+
+      % Enforce continuity
+      constraints = [constraints, velocity.body(:,end) == velocity.body(:,1)];
+      constraints = [constraints, acceleration.body(:,end) == acceleration.body(:,1)];
+      constraints = [constraints, velocity.body(1,:) >= 1.105];
+      constraints = [constraints, pose.body(1:2,1) == 0];
+      constraints = [constraints, pose.body(2:3,1) == pose.body(2:3,end)];
+      for f = obj.feet
+        foot = f{1};
+        constraints = [constraints, gait.(foot)(1) == gait.(foot)(end)];
+      end
 
       % Constrain the initial conditions
-      start_fields = fieldnames(obj.start_pose)';
-      for f = start_fields
-        field = f{1};
-        constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2),...
-          velocity.body(:,1) == 0,...
-        ];
-      end
+      % start_fields = fieldnames(obj.start_pose)';
+      % for f = start_fields
+      %   field = f{1};
+      %   constraints = [constraints, pose.(field)(1:2, 1) == obj.start_pose.(field)(1:2),...
+      %     velocity.body(:,1) == 0,...
+      %   ];
+      % end
 
       for f = obj.feet
         foot = f{1};
       % Feet on the ground at the start and end
-        constraints = [constraints, gait.(foot)([1, end]) == 1];
+        % constraints = [constraints, gait.(foot)([1, end]) == 1];
         % complementarity conditions
         constraints = [constraints,...
-          -obj.foot_force * gait.(foot) <= contact_force.(foot)(1,:) <= obj.foot_force * gait.(foot),...
-          -obj.foot_force * gait.(foot) <= contact_force.(foot)(2,:) <= obj.foot_force * gait.(foot),...
-          -obj.foot_force * gait.(foot) <= contact_force.(foot)(3,:) <= obj.foot_force * gait.(foot),...
-          gait.(foot)(1:2:end) == gait.(foot)(2:2:end),...
+          -contact_force.(foot)(3,:) <= contact_force.(foot)(1,:) <= contact_force.(foot)(3,:),...
+          -contact_force.(foot)(3,:) <= contact_force.(foot)(2,:) <= contact_force.(foot)(3,:),...
+          0 <= contact_force.(foot)(3,:) <= obj.foot_force * gait.(foot),...
+          % gait.(foot)(1:2:end) == gait.(foot)(2:2:end),...
           ];
       end
 
       constraints = [constraints,...
-          angular_momentum.body(:,1) == 0,...
-          angular_momentum.body(:,end) == 0,...
+          % angular_momentum.body(:,1) == 0,...
+          % angular_momentum.body(:,end) == 0,...
+          angular_momentum.body(:,1) == angular_momentum.body(:,end),...
           abs(angular_momentum.body) <= obj.max_angular_momentum,...
           ];
 
@@ -171,11 +182,6 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         % Foot-specific constraints
         for f = obj.feet
           foot = f{1};
-          
-          % Enforce friction cone (sort of)
-          constraints = [constraints,...
-            0 <= contact_force.(foot)(3,j),...
-            ];
 
           % Enforce reachability
           constraints = [constraints,...
@@ -205,7 +211,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
             constraints = [constraints,...
               implies(gait.(foot)(j), pose.(foot)(:,j) == pose.(foot)(:,j+1)),...
               implies(gait.(foot)(j), region.(foot)(:,j) == region.(foot)(:,j+1)),...
-              % obj.pcone((pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j)) - velocity.body(1:2,j), obj.dt * obj.swing_speed + MAX_DISTANCE * gait.(foot)(j), 8),...
+              obj.pcone((pose.(foot)(1:2,j+1) - pose.(foot)(1:2,j))/obj.dt - velocity.body(1:2,j), obj.swing_speed + MAX_DISTANCE / obj.dt * gait.(foot)(j), 4),...
               ];
           end
         end
@@ -213,21 +219,28 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
 
       objective = 0;
 
-      fnames = fieldnames(obj.goal_pose)';
-      for f = fnames
-        field = f{1};
-        for k = 1:length(POSE_INDICES)
-          if ~isnan(obj.goal_pose.(field)(POSE_INDICES(k)))
-            constraints = [constraints, pose.(field)(k,end) == obj.goal_pose.(field)(POSE_INDICES(k))];
-          end
-        end
-      end
-      % for f = obj.feet
-      %   foot = f{1};
-      %   objective = objective + 0.05 * sum(sum(contact_force.(foot).^2,1));
+      % fnames = fieldnames(obj.goal_pose)';
+      % for f = fnames
+      %   field = f{1};
+      %   for k = 1:length(POSE_INDICES)
+      %     if ~isnan(obj.goal_pose.(field)(POSE_INDICES(k)))
+      %       constraints = [constraints, pose.(field)(k,end) == obj.goal_pose.(field)(POSE_INDICES(k))];
+      %     end
+      %   end
       % end
+
+      % Penalize contact force
       objective = objective + 0.05 * (sum(sum(contact_force.total.^2,1)) - (obj.g * obj.body_mass)^2 * (obj.nframes-1));
-      objective = objective + 0.05 * sum(sum(angular_momentum.body.^2,1));
+
+      % Penalize angular momentum
+      objective = objective + 0.01 * sum(sum(angular_momentum.body.^2,1));
+
+      % Keep the legs near the body if possible
+      for f = obj.feet
+        foot = f{1};
+        objective = objective + 0.01 * sum(sum(abs(pose.(foot)-pose.body), 1));
+        % objective = objective + 0.01 * sum(sum((pose.(foot)-pose.body).^2,1));
+      end
 
       optimize(constraints, objective, sdpsettings('solver', 'gurobi'));
 
@@ -299,6 +312,22 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       title('lh')
       subplot(224)
       plot(t, double(contact_force.rh(3,:)));
+      title('rh')
+
+      figure(8);
+      clf
+      hold on
+      subplot(221)
+      plot(t(1:end-1), sqrt(sum(double((pose.lf(1:2,2:end) - pose.lf(1:2,1:end-1))/obj.dt - velocity.body(1:2,1:end-1)).^2,1)));
+      title('lf')
+      subplot(222)
+      plot(t(1:end-1), sqrt(sum(double((pose.rf(1:2,2:end) - pose.rf(1:2,1:end-1))/obj.dt - velocity.body(1:2,1:end-1)).^2,1)));
+      title('rf')
+      subplot(223)
+      plot(t(1:end-1), sqrt(sum(double((pose.lh(1:2,2:end) - pose.lh(1:2,1:end-1))/obj.dt - velocity.body(1:2,1:end-1)).^2,1)));
+      title('lh')
+      subplot(224)
+      plot(t(1:end-1), sqrt(sum(double((pose.rh(1:2,2:end) - pose.rh(1:2,1:end-1))/obj.dt - velocity.body(1:2,1:end-1)).^2,1)));
       title('rh')
 
     end
