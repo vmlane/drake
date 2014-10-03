@@ -6,7 +6,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
     foot_force = 30;
     body_mass = 5; % kg
     nominal_com_height = 0.2; % m
-    max_angular_momentum = 0; 
+    max_angular_momentum = 3; 
   end
 
   methods
@@ -71,7 +71,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
         sum(yaw_sector, 1) == 1,...
         -1 <= sin_yaw <= 1,...
         -1 <= cos_yaw <= 1,...
-        yaw_sector(5,:) == 1,... % Disable yaw
+        % yaw_sector(5,:) == 1,... % Disable yaw
         % gait_sum >= 1,...
         ];
 
@@ -222,10 +222,12 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
           end
         end
       end
-      for f = obj.feet
-        foot = f{1};
-        objective = objective + 0.05 * sum(sum(contact_force.(foot).^2,1));
-      end
+      % for f = obj.feet
+      %   foot = f{1};
+      %   objective = objective + 0.05 * sum(sum(contact_force.(foot).^2,1));
+      % end
+      objective = objective + 0.05 * (sum(sum(contact_force.total.^2,1)) - (obj.g * obj.body_mass)^2 * (obj.nframes-1));
+      objective = objective + 0.05 * sum(sum(angular_momentum.body.^2,1));
 
       optimize(constraints, objective, sdpsettings('solver', 'gurobi'));
 
