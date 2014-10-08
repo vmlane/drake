@@ -81,7 +81,7 @@ classdef NonGaitedFootstepPlanningProblem < FootstepPlanningProblem
       % Enforce continuity
       constraints = [constraints, velocity.body(:,end) == velocity.body(:,1)];
       constraints = [constraints, acceleration.body(:,end) == acceleration.body(:,1)];
-      constraints = [constraints, velocity.body(1,:) >= 1.105];
+      constraints = [constraints, velocity.body(1,:) >= 0.5];
       constraints = [constraints, pose.body(1:2,1) == 0];
       constraints = [constraints, pose.body(2:3,1) == pose.body(2:3,end)];
       for f = obj.feet
