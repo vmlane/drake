@@ -4,7 +4,10 @@ classdef LeggedRobot
   % eventually like to move general-purpose multi-leg walking planning into
   % this class.
 
-  properties(Abstract)
+  properties(Abstract,SetAccess = protected, GetAccess = public)
+    foot_names
+  end
+  properties (Abstract)
     fixed_point_file
   end
 
@@ -12,7 +15,6 @@ classdef LeggedRobot
     function obj = LeggedRobot(obj)
       typecheck(obj,{'RigidBodyManipulator','TimeSteppingRigidBodyManipulator'});
     end
-
   end
 
   methods(Abstract)
@@ -23,6 +25,13 @@ classdef LeggedRobot
     function xstar = loadFixedPoint(obj)
       load(obj.fixed_point_file, 'xstar');
     end
+    function foot_idx = getFootIdx(obj)
+      % Get the link index for each foot of the legged robot
+      foot_idx = zeros(1,length(obj.foot_names));
+      for i = 1:length(obj.foot_names)
+          foot_idx(i) = findLinkInd(obj,obj.foot_names{i});
+      end
+    end 
   end
 end
 

@@ -173,6 +173,7 @@ classdef Atlas < TimeSteppingRigidBodyManipulator & Biped
 
   properties (SetAccess = protected, GetAccess = public)
     x0
+    foot_names
     default_footstep_params = struct('nom_forward_step', 0.17,... % m
                                       'max_forward_step', 0.18,...% m
                                       'max_step_width', 0.32,...% m

@@ -14,7 +14,6 @@ classdef QPController < MIMODrakeSystem
     % solution, etc.
     % @param options structure for specifying objective weights, slack
     % bounds, etc.
-    typecheck(r,'Biped');
     typecheck(controller_data,'QPControllerData');
     
     if nargin>3
@@ -162,9 +161,8 @@ classdef QPController < MIMODrakeSystem
     else
       obj.use_mex = 1;
     end
-    
-    obj.rfoot_idx = findLinkInd(r,'r_foot');
-    obj.lfoot_idx = findLinkInd(r,'l_foot');
+
+    obj.foot_idx = r.getFootIdx();
       
     obj.gurobi_options.outputflag = 0; % not verbose
     if options.solver==0
@@ -279,25 +277,18 @@ classdef QPController < MIMODrakeSystem
     contact_pts = {};
     contact_groups = {};
     n_contact_pts = [];
-    ind = 1;
     
     supp_idx = find(ctrl_data.support_times<=t,1,'last');
     plan_supp = ctrl_data.supports(supp_idx);
 
-    lfoot_plan_supp_ind = plan_supp.bodies==obj.lfoot_idx;
-    rfoot_plan_supp_ind = plan_supp.bodies==obj.rfoot_idx;
-    if fc(1)>0
-      support_bodies(ind) = obj.lfoot_idx;
-      contact_pts{ind} = plan_supp.contact_pts{lfoot_plan_supp_ind};
-      contact_groups{ind} = plan_supp.contact_groups{lfoot_plan_supp_ind};
-      n_contact_pts(ind) = plan_supp.num_contact_pts(lfoot_plan_supp_ind);
-      ind=ind+1;
-    end
-    if fc(2)>0
-      support_bodies(ind) = obj.rfoot_idx;
-      contact_pts{ind} = plan_supp.contact_pts{rfoot_plan_supp_ind};
-      contact_groups{ind} = plan_supp.contact_groups{rfoot_plan_supp_ind};
-      n_contact_pts(ind) = plan_supp.num_contact_pts(rfoot_plan_supp_ind);
+    for i = 1:length(obj.foot_idx)
+        plan_supp_ind = plan_supp.bodies==obj.foot_idx(i);
+        if fc(i)>0
+          support_bodies(i) = obj.foot_idx(i);
+          contact_pts{i} = plan_supp.contact_pts{plan_supp_ind};
+          contact_groups{i} = plan_supp.contact_groups{plan_supp_ind};
+          n_contact_pts(i) = plan_supp.num_contact_pts(plan_supp_ind);
+        end
     end
     
     supp.bodies = support_bodies;
@@ -677,8 +668,7 @@ classdef QPController < MIMODrakeSystem
     slack_limit; % maximum absolute magnitude of acceleration slack variable values
     Kp_ang; % proportunal gain for angular momentum feedback
     Kp_accel; % gain for support acceleration constraint: accel=-Kp_accel*vel
-    rfoot_idx;
-    lfoot_idx;
+    foot_idx;
     gurobi_options = struct();
     solver=0;
     use_mex;

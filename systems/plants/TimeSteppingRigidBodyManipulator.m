@@ -895,7 +895,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     end
 
     function link_names = getLinkNames(obj)
-      link_names =  {obj.manip.body.linkname}';
+      link_names =  obj.manip.getLinkNames();
     end
 
     function joint_names = getJointNames(obj)

@@ -286,6 +286,20 @@ classdef RigidBodyManipulator < Manipulator
         str = obj.body(body_ind).linkname;
       end
     end
+    
+    function link_names = getLinkNames(obj)
+      % link_names = getLinkNames(obj) returns a cell array of strings  
+      % containing the link names of the specified body.
+      %
+      % @param obj - RigidBodyManipulator object
+      %
+      % @retval str - String (cell array of strings) containing the
+      % requested linknames
+      %
+      % @ingroup Kinematic Tree
+
+      link_names = {obj.body.linkname}';
+    end
 
     function obj = setGravity(obj,grav)
       sizecheck(grav,size(obj.gravity));

@@ -5,8 +5,7 @@ classdef FootContactBlock < MIMODrakeSystem
     num_outputs;
     mex_ptr;
     controller_data;
-    lfoot_idx;
-    rfoot_idx;
+    foot_idx;
     using_flat_terrain; % true if using DRCFlatTerrain
     contact_threshold; % min height above terrain to be considered in contact
     use_lcm;
@@ -27,7 +26,6 @@ classdef FootContactBlock < MIMODrakeSystem
       %         if true: do logical OR with planned support and sensed 
       %           support except when breaking contact
 
-      typecheck(r,'Biped');
       typecheck(controller_data,'QPControllerData');
        
       if nargin<3
@@ -121,8 +119,7 @@ classdef FootContactBlock < MIMODrakeSystem
       end      
       obj.mex_ptr = SharedDataHandle(supportDetectmex(0,r.getMexModelPtr.ptr,terrain_map_ptr));
   
-      obj.rfoot_idx = findLinkInd(r,'r_foot');
-      obj.lfoot_idx = findLinkInd(r,'l_foot');
+      obj.foot_idx = r.getFootIdx();
           
       if isa(getTerrain(r),'DRCFlatTerrainMap')
         obj.using_flat_terrain = true;      
@@ -175,7 +172,10 @@ classdef FootContactBlock < MIMODrakeSystem
       
       active_supports = supportDetectmex(obj.mex_ptr.data,x,supp,contact_sensor,contact_thresh,height,contact_logic_AND);
 
-      y = [1.0*any(active_supports==obj.lfoot_idx); 1.0*any(active_supports==obj.rfoot_idx)];
+      y = zeros(length(obj.foot_idx),1);
+      for i = 1:length(obj.foot_idx)
+         y(i,:) = 1.0*any(active_supports== obj.foot_idx(i));
+      end
       if obj.num_outputs > 1
         varargout = cell(1,obj.num_outputs);
         for i=1:obj.num_outputs
