@@ -41,8 +41,8 @@ classdef Biped < LeggedRobot
       end
       obj.foot_frame_id = struct('left', l_frame_id, 'right', r_frame_id);
     
-      obj.foot_names = {'r_foot';
-                        'l_foot'};
+      obj.foot_names = {'l_foot'; 
+                        'r_foot'}; % MUST be in this order
     end
 
     function [A, b] = getReachabilityPolytope(obj, stance_foot_frame, swing_foot_frame, params)

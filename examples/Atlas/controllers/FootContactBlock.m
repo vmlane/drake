@@ -96,16 +96,16 @@ classdef FootContactBlock < MIMODrakeSystem
       obj.controller_data = controller_data;
       obj.num_outputs = options.num_outputs;
       
-      if obj.use_lcm
-        obj.contact_est_monitor = drake.util.MessageMonitor(drc.foot_contact_estimate_t,'utime');
-        lc = lcm.lcm.LCM.getSingleton();
-        if isfield(options,'channel')
-          typecheck(options.channel,'char');
-        else
-          options.channel='FOOT_CONTACT_ESTIMATE';
-        end
-        lc.subscribe(options.channel,obj.contact_est_monitor);
-      end
+%       if obj.use_lcm
+%         obj.contact_est_monitor = drake.util.MessageMonitor(drc.foot_contact_estimate_t,'utime');
+%         lc = lcm.lcm.LCM.getSingleton();
+%         if isfield(options,'channel')
+%           typecheck(options.channel,'char');
+%         else
+%           options.channel='FOOT_CONTACT_ESTIMATE';
+%         end
+%         lc.subscribe(options.channel,obj.contact_est_monitor);
+%       end
       
       terrain = getTerrain(r);
       if isa(terrain,'DRCTerrainMap') 
@@ -149,15 +149,15 @@ classdef FootContactBlock < MIMODrakeSystem
       % contact_sensor = -1 (no info), 0 (info, no contact), 1 (info, yes contact)
       contact_sensor=-1+0*supp.bodies;  % initialize to -1 for all
 
-      if obj.use_lcm
-        % get foot contact state over LCM
-        contact_data = obj.contact_est_monitor.getMessage(); % slow
-        if ~isempty(contact_data)
-          msg = drc.foot_contact_estimate_t(contact_data);
-          contact_sensor(supp.bodies==obj.lfoot_idx) = msg.left_contact > 0.5;
-          contact_sensor(supp.bodies==obj.rfoot_idx) = msg.right_contact > 0.5;
-        end
-      end      
+%       if obj.use_lcm
+%         % get foot contact state over LCM
+%         contact_data = obj.contact_est_monitor.getMessage(); % slow
+%         if ~isempty(contact_data)
+%           msg = drc.foot_contact_estimate_t(contact_data);
+%           contact_sensor(supp.bodies==obj.lfoot_idx) = msg.left_contact > 0.5;
+%           contact_sensor(supp.bodies==obj.rfoot_idx) = msg.right_contact > 0.5;
+%         end
+%       end      
       
       if ctrl_data.ignore_terrain
         contact_thresh =-1;       
@@ -174,8 +174,9 @@ classdef FootContactBlock < MIMODrakeSystem
 
       y = zeros(length(obj.foot_idx),1);
       for i = 1:length(obj.foot_idx)
-         y(i,:) = 1.0*any(active_supports== obj.foot_idx(i));
+         y(i) = 1.0*any(active_supports==obj.foot_idx(i));
       end
+      
       if obj.num_outputs > 1
         varargout = cell(1,obj.num_outputs);
         for i=1:obj.num_outputs

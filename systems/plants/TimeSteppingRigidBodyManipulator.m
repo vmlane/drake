@@ -939,7 +939,16 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
     function fr = getParamFrame(model)
       fr = getParamFrame(model.manip);
     end
+    
+    function varargout = getBodyOrFrameName(obj,varargin)
+      varargout = cell(1,nargout);
+      [varargout{:}] = getBodyOrFrameName(obj.manip,varargin{:});
+    end
 
+    function fr = getPositionFrame(obj,robotnum)
+        fr = getPositionFrame(obj.manip);
+    end
+    
     function model = setParams(model,p)
       model.manip = setParams(model.manip,p);
     end

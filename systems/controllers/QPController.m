@@ -161,7 +161,7 @@ classdef QPController < MIMODrakeSystem
     else
       obj.use_mex = 1;
     end
-
+    
     obj.foot_idx = r.getFootIdx();
       
     obj.gurobi_options.outputflag = 0; % not verbose
@@ -277,17 +277,19 @@ classdef QPController < MIMODrakeSystem
     contact_pts = {};
     contact_groups = {};
     n_contact_pts = [];
+    ind = 1;
     
     supp_idx = find(ctrl_data.support_times<=t,1,'last');
-    plan_supp = ctrl_data.supports(supp_idx);
-
+    plan_supp = ctrl_data.supports(supp_idx);    
+    
     for i = 1:length(obj.foot_idx)
-        plan_supp_ind = plan_supp.bodies==obj.foot_idx(i);
+        foot_plan_supp_ind = plan_supp.bodies==obj.foot_idx(i);
         if fc(i)>0
-          support_bodies(i) = obj.foot_idx(i);
-          contact_pts{i} = plan_supp.contact_pts{plan_supp_ind};
-          contact_groups{i} = plan_supp.contact_groups{plan_supp_ind};
-          n_contact_pts(i) = plan_supp.num_contact_pts(plan_supp_ind);
+          support_bodies(ind) = obj.foot_idx(i);
+          contact_pts{ind} = plan_supp.contact_pts{foot_plan_supp_ind};
+          contact_groups{ind} = plan_supp.contact_groups{foot_plan_supp_ind};
+          n_contact_pts(ind) = plan_supp.num_contact_pts(foot_plan_supp_ind);
+          ind=ind+1;
         end
     end
     
@@ -300,7 +302,7 @@ classdef QPController < MIMODrakeSystem
     if (obj.use_mex==0 || obj.use_mex==2)
       kinsol = doKinematics(r,q,false,true,qd);
 
-      active_supports = supp.bodies;
+      active_supports = supp.bodies
       active_contact_pts = supp.contact_pts;
       active_contact_groups = supp.contact_groups;
       num_active_contacts = supp.num_contact_pts;      
