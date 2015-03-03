@@ -302,7 +302,7 @@ classdef QPController < MIMODrakeSystem
     if (obj.use_mex==0 || obj.use_mex==2)
       kinsol = doKinematics(r,q,false,true,qd);
 
-      active_supports = supp.bodies
+      active_supports = supp.bodies;
       active_contact_pts = supp.contact_pts;
       active_contact_groups = supp.contact_groups;
       num_active_contacts = supp.num_contact_pts;      
@@ -310,7 +310,7 @@ classdef QPController < MIMODrakeSystem
       dim = 3; % 3D
       nd = 4; % for friction cone approx, hard coded for now
       float_idx = 1:6; % indices for floating base dofs
-      act_idx = 7:nq; % indices for actuated dofs
+      act_idx = 1:nq; % indices for actuated dofs
 
       [H,C,B] = manipulatorDynamics(r,q,qd);
 
@@ -392,14 +392,16 @@ classdef QPController < MIMODrakeSystem
       bin_ = cell(1,2);
 
       % constrained dynamics
-      if nc>0
-        Aeq_{1} = H_float*Iqdd - Dbar_float*Ibeta;
-      else
-        Aeq_{1} = H_float*Iqdd;
+      if r.floating
+        if nc>0
+          Aeq_{1} = H_float*Iqdd - Dbar_float*Ibeta;
+        else
+          Aeq_{1} = H_float*Iqdd;
+        end
+        beq_{1} = -C_float;
       end
-      beq_{1} = -C_float;
-
-      % input saturation constraints
+      
+        % input saturation constraints
       % u=B_act'*(H_act*qdd + C_act - Jz_act'*z - Dbar_act*beta)
 
       if nc>0
@@ -560,6 +562,13 @@ classdef QPController < MIMODrakeSystem
       % Solve for inputs ----------------------------------------------------
 
       qdd = alpha(1:nq);
+      
+      % max error
+      val = Iqdd*alpha-qddot_des;
+      [~,ind_max_e] = max(abs(val));
+      ave = mean(abs(val(4:6))); %10:12 for floating base
+      display(sprintf('t: %1.3f, i: %d, qddot_des: %3.2f, err:%3.2f, ave:%3.2f\n',t,ind_max_e,qddot_des(ind_max_e),val(ind_max_e),ave));
+      
       if nc>0
         beta = alpha(nq+(1:nf));
         u = B_act'*(H_act*qdd + C_act - Dbar_act*beta);
