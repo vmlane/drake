@@ -25,7 +25,6 @@ else % then try to evaluate the dependency now...
       end
 
     case 'spotless'
-      % require spotless
       conf.spotless_enabled = logical(exist('msspoly','class'));
       if ~conf.spotless_enabled
         if ~pod_pkg_config('spotless')
@@ -56,7 +55,7 @@ else % then try to evaluate the dependency now...
 
         if (conf.lcm_enabled)
           javaaddpathProtectGlobals(fullfile(pods_get_base_path,'share','java','lcmtypes_drake.jar'));
-          [retval,info] = systemWCMakeEnv([getDrakePath,'/util/check_multicast_is_loopback.sh']);
+          [retval,info] = systemWCMakeEnv(fullfile(getDrakePath(),'util','check_multicast_is_loopback.sh'));
           if (retval)
             info = strrep(info,'ERROR: ','');
             info = strrep(info,'./',[getDrakePath,'/util/']);
@@ -293,9 +292,12 @@ else % then try to evaluate the dependency now...
 
     case 'yalmip'
       conf.yalmip_enabled = logical(exist('sdpvar','file'));
+      if (~conf.yalmip_enabled)
+        conf.yalmip_enabled = pod_pkg_config('yalmip') && logical(exist('sdpvar','file'));
+      end
       if ~conf.yalmip_enabled && nargout<1
         disp(' ');
-        disp(' YALMIP not found.  YALMIP support will be disabled.  To re-enable, install YALMIP and rerun addpath_drake.');
+        disp(' YALMIP not found.  To enable, install YALMIP (e.g. by cloning https://github.com/RobotLocomotion/yalmip into drake-distro and running make).');
         disp(' ');
       end
 
@@ -376,6 +378,16 @@ else % then try to evaluate the dependency now...
           disp(' ');
         end
       end
+      
+    case 'nonlinearprogramsnoptmex'
+      conf.nonlinearprogramsnoptmex_enabled = logical(exist('NonlinearProgramSnoptmex','file')==3);
+      if(~conf.nonlinearprogramsnoptmex_enabled)
+        if(nargout<1)
+          disp(' ');
+          disp(' NonlinearProgramSnoptmex is disabled. To enable it, compile NonlinearProgramSnoptmex.cpp with snopt');
+          disp(' ');
+        end
+      end
 
     case 'iris'
       conf.iris_enabled = logical(exist('+iris/inflate_region.m','file')); 
@@ -439,7 +451,7 @@ end
 
 function [snopt_enabled,studentsnopt_enabled] = snoptEnabled()
 % check if snopt exists, if it does, check if it is student version
-snopt_val = logical(exist('snset','file'));
+snopt_val = logical(exist('snopt.m','file'));
 if(snopt_val)
   snopt_path = which('snopt.m');
   snopt_readme=fileread([snopt_path(1:end-7),'README']);

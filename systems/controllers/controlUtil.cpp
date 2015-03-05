@@ -42,15 +42,6 @@ void angleDiff(MatrixBase<DerivedPhi1> const &phi1, MatrixBase<DerivedPhi2> cons
   }
 }
 
-template <typename DerivedA>
-mxArray* eigenToMatlab(const DerivedA &m)
-{
- mxArray* pm = mxCreateDoubleMatrix(m.rows(),m.cols(),mxREAL);
- if (m.rows()*m.cols()>0)
-   memcpy(mxGetPr(pm),m.data(),sizeof(double)*m.rows()*m.cols());
- return pm;
-}
-
 mxArray* myGetProperty(const mxArray* pobj, const char* propname)
 {
   mxArray* pm = mxGetProperty(pobj,0,propname);
@@ -101,11 +92,13 @@ void surfaceTangents(const Vector3d & normal, Matrix<double,3,m_surface_tangents
   Vector3d t1,t2;
   double theta;
   
-  if (1 - normal(2) < 10e-8) { // handle the unit-normal case (since it's unit length, just check z)
+  if (1 - normal(2) < EPSILON) { // handle the unit-normal case (since it's unit length, just check z)
     t1 << 1,0,0;
-  } else { // now the general case
-    t1 << normal(2), -normal(1), 0; // normal.cross([0;0;1])
-    t1 /= sqrt(normal(1)*normal(1) + normal(2)*normal(2));
+  } else if(1 + normal(2) < EPSILON) {
+    t1 << -1,0,0;  //same for the reflected case
+  } else {// now the general case
+  t1 << normal(1), -normal(0) , 0;
+    t1 /= sqrt(normal(1)*normal(1) + normal(0)*normal(0));
   }
       
   t2 = t1.cross(normal);
@@ -118,8 +111,8 @@ void surfaceTangents(const Vector3d & normal, Matrix<double,3,m_surface_tangents
 
 int contactPhi(RigidBodyManipulator* r, SupportStateElement& supp, void *map_ptr, VectorXd &phi, double terrain_height)
 {
-  std::unique_ptr<RigidBody>& b = r->bodies[supp.body_idx];
-  int nc = supp.contact_pt_inds.size();
+  std::shared_ptr<RigidBody>& b = r->bodies[supp.body_idx];
+  int nc = static_cast<int>(supp.contact_pt_inds.size());
   phi.resize(nc);
 
   if (nc<1) return nc;
@@ -146,7 +139,7 @@ int contactPhi(RigidBodyManipulator* r, SupportStateElement& supp, void *map_ptr
 
 int contactConstraints(RigidBodyManipulator *r, int nc, std::vector<SupportStateElement>& supp, void *map_ptr, MatrixXd &n, MatrixXd &D, MatrixXd &Jp, MatrixXd &Jpdot,double terrain_height)
 {
-  int j, k=0, nq = r->num_dof;
+  int j, k=0, nq = r->num_positions;
 
   n.resize(nc,nq);
   D.resize(nq,nc*2*m_surface_tangents);
@@ -158,7 +151,7 @@ int contactConstraints(RigidBodyManipulator *r, int nc, std::vector<SupportState
   Matrix<double,3,m_surface_tangents> d;
   
   for (std::vector<SupportStateElement>::iterator iter = supp.begin(); iter!=supp.end(); iter++) {
-    std::unique_ptr<RigidBody>& b = r->bodies[iter->body_idx];
+    std::shared_ptr<RigidBody>& b = r->bodies[iter->body_idx];
     if (nc>0) {
       for (std::set<int>::iterator pt_iter=iter->contact_pt_inds.begin(); pt_iter!=iter->contact_pt_inds.end(); pt_iter++) {
         if (*pt_iter<0 || *pt_iter>=b->contact_pts.cols()) mexErrMsgIdAndTxt("DRC:ControlUtil:BadInput","requesting contact pt %d but body only has %d pts",*pt_iter,b->contact_pts.cols());
@@ -192,7 +185,7 @@ int contactConstraints(RigidBodyManipulator *r, int nc, std::vector<SupportState
 
 int contactConstraintsBV(RigidBodyManipulator *r, int nc, double mu, std::vector<SupportStateElement>& supp, void *map_ptr, MatrixXd &B, MatrixXd &JB, MatrixXd &Jp, MatrixXd &Jpdot, MatrixXd &normals, double terrain_height)
 {
-  int j, k=0, nq = r->num_dof;
+  int j, k=0, nq = r->num_positions;
 
   B.resize(3,nc*2*m_surface_tangents);
   JB.resize(nq,nc*2*m_surface_tangents);
@@ -206,7 +199,7 @@ int contactConstraintsBV(RigidBodyManipulator *r, int nc, double mu, std::vector
   double norm = sqrt(1+mu*mu); // because normals and ds are orthogonal, the norm has a simple form
   
   for (std::vector<SupportStateElement>::iterator iter = supp.begin(); iter!=supp.end(); iter++) {
-    std::unique_ptr<RigidBody>& b = r->bodies[iter->body_idx];
+    std::shared_ptr<RigidBody>& b = r->bodies[iter->body_idx];
     if (nc>0) {
       for (std::set<int>::iterator pt_iter=iter->contact_pt_inds.begin(); pt_iter!=iter->contact_pt_inds.end(); pt_iter++) {
         if (*pt_iter<0 || *pt_iter>=b->contact_pts.cols()) mexErrMsgIdAndTxt("DRC:ControlUtil:BadInput","requesting contact pt %d but body only has %d pts",*pt_iter,b->contact_pts.cols());
@@ -242,8 +235,8 @@ int contactConstraintsBV(RigidBodyManipulator *r, int nc, double mu, std::vector
 MatrixXd individualSupportCOPs(RigidBodyManipulator* r, const std::vector<SupportStateElement>& active_supports,
     const MatrixXd& normals, const MatrixXd& B, const VectorXd& beta)
 {
-  const int n_basis_vectors_per_contact = B.cols() / normals.cols();
-  const int n = active_supports.size();
+  const int n_basis_vectors_per_contact = static_cast<int>(B.cols() / normals.cols());
+  const int n = static_cast<int>(active_supports.size());
 
   int normals_start = 0;
   int beta_start = 0;
@@ -255,7 +248,7 @@ MatrixXd individualSupportCOPs(RigidBodyManipulator* r, const std::vector<Suppor
     auto active_support = active_supports[j];
     auto contact_pt_inds = active_support.contact_pt_inds;
 
-    int ncj = contact_pt_inds.size();
+    int ncj = static_cast<int>(contact_pt_inds.size());
     int active_support_length = n_basis_vectors_per_contact * ncj;
     auto normalsj = normals.middleCols(normals_start, ncj);
     Vector3d normal = normalsj.col(0);

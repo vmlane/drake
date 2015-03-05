@@ -17,8 +17,8 @@ classdef PlanarRigidBodyVisualizer < RigidBodyVisualizer
       w = warning('off','Drake:RigidBodyGeometry:SimplifiedCollisionGeometry');
       for i=1:length(obj.model.body)
         b = obj.model.body(i);
-        for j=1:length(b.visual_shapes)
-          [obj.body(i).x{j},obj.body(i).y{j},obj.body(i).z{j},obj.body(i).c{j}] = getPatchData(b.visual_shapes{j},manip.x_axis,manip.y_axis, manip.view_axis);
+        for j=1:length(b.visual_geometry)
+          [obj.body(i).x{j},obj.body(i).y{j},obj.body(i).z{j},obj.body(i).c{j}] = getPatchData(b.visual_geometry{j},manip.x_axis,manip.y_axis, manip.view_axis);
         end
       end
       warning(w);
@@ -63,6 +63,15 @@ classdef PlanarRigidBodyVisualizer < RigidBodyVisualizer
             parent_origin = forwardKin(obj.model,kinsol,body.parent,[0;0]);
             line([origin(1),parent_origin(1)],[origin(2),parent_origin(2)],'Color','k');
           end
+        end
+      end
+      
+      for j=1:length(obj.model.position_constraints)
+        % todo: generalize this to all position constraints?
+        if isa(obj.model.position_constraints{j},'DrakeFunctionConstraint') && isa(obj.model.position_constraints{j}.fcn,'drakeFunction.kinematic.CableLength')
+          [pts,edges] = getSegments(obj.model.position_constraints{j}.fcn,q);
+          pts = obj.Tview*pts; x=pts(1,:);y=pts(2,:);z=pts(3,:);
+          line(x(edges),y(edges),z(edges),'Color','k','LineWidth',3);
         end
       end
 

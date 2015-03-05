@@ -50,15 +50,19 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     mexErrMsgIdAndTxt("DRC:supportDetectmex:BadInputs","the first argument should be the ptr");
   memcpy(&pdata,mxGetData(prhs[0]),sizeof(pdata));
 
-  int nq = pdata->r->num_dof;
+  int nq = pdata->r->num_positions;
+  int nv = pdata->r->num_velocities;
 
   int narg=1;  
   double *q = mxGetPr(prhs[narg++]);
   double *qd = &q[nq];
   
+  Map<VectorXd> qvec(q,nq);
+  Map<VectorXd> qdvec(qd, nv);
+
   int desired_support_argid = narg++;
 
-  double* double_contact_sensor = mxGetPr(prhs[narg]); int len = mxGetNumberOfElements(prhs[narg++]);
+  double* double_contact_sensor = mxGetPr(prhs[narg]); int len = static_cast<int>(mxGetNumberOfElements(prhs[narg++]));
   VectorXi contact_sensor(len);  
   for (i=0; i<len; i++)
     contact_sensor(i)=(int)double_contact_sensor[i];
@@ -67,7 +71,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   
   int contact_logic_AND = (int) mxGetScalar(prhs[narg++]); // true if we should AND plan and sensor, false if we should OR them
 
-  pdata->r->doKinematics(q,false,qd);
+  pdata->r->doKinematics(qvec,false,qdvec);
 
   //---------------------------------------------------------------------
   // Compute active support from desired supports -----------------------
@@ -88,7 +92,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     
     for (i=0; i<mxGetNumberOfElements(mxBodies);i++) {
       mxArray* mxBodyContactPts = mxGetCell(mxContactPts,i);
-      int nc = mxGetNumberOfElements(mxBodyContactPts);
+      int nc = static_cast<int>(mxGetNumberOfElements(mxBodyContactPts));
       if (nc<1) continue;
       
       SupportStateElement se;
@@ -124,7 +128,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   }
 
   if (nlhs>0) {
-    plhs[0] = mxCreateDoubleMatrix(1,active_supports.size(),mxREAL);
+    plhs[0] = mxCreateDoubleMatrix(1,static_cast<int>(active_supports.size()),mxREAL);
     pr = mxGetPr(plhs[0]);
     int i=0;
     for (vector<SupportStateElement>::iterator iter = active_supports.begin(); iter!=active_supports.end(); iter++) {

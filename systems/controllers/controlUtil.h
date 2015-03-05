@@ -27,6 +27,8 @@
 
 const int m_surface_tangents = 2;  // number of faces in the friction cone approx
 
+#define EPSILON 10e-8
+
 typedef Matrix<double, 6,1> Vector6d;
 
 typedef struct _support_state_element
@@ -44,9 +46,6 @@ drakeControlUtilEXPORT void getCols(std::set<int> &cols, MatrixBase<DerivedA> co
 
 template <typename DerivedPhi1, typename DerivedPhi2, typename DerivedD>
 drakeControlUtilEXPORT void angleDiff(MatrixBase<DerivedPhi1> const &phi1, MatrixBase<DerivedPhi2> const &phi2, MatrixBase<DerivedD> &d);
-
-template <typename DerivedA>
-drakeControlUtilEXPORT mxArray* eigenToMatlab(const DerivedA &m);
 
 drakeControlUtilEXPORT mxArray* myGetProperty(const mxArray* pobj, const char* propname);
 drakeControlUtilEXPORT mxArray* myGetField(const mxArray* pobj, const char* propname);

@@ -3,11 +3,12 @@
 
 #include "FixedAxisOneDoFJoint.h"
 
-class HelicalJoint: public FixedAxisOneDoFJoint
+class DLLEXPORT_DRAKEJOINT HelicalJoint: public FixedAxisOneDoFJoint
 {
   // disable copy construction and assignment
-  HelicalJoint(const HelicalJoint&) = delete;
-  HelicalJoint& operator=(const HelicalJoint&) = delete;
+  // not available in MSVC2010...
+  // HelicalJoint(const HelicalJoint&) = delete;
+  // HelicalJoint& operator=(const HelicalJoint&) = delete;
 
 private:
   const Eigen::Vector3d axis;
@@ -18,7 +19,7 @@ public:
 
   virtual ~HelicalJoint();
 
-  virtual Eigen::Isometry3d jointTransform(double* const q) const; //override;
+  virtual Eigen::Isometry3d jointTransform(const Eigen::Ref<const Eigen::VectorXd>& q) const; //override;
 
 private:
   static Eigen::Matrix<double, TWIST_SIZE, 1> spatialJointAxis(const Eigen::Vector3d& axis, double pitch);

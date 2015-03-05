@@ -66,7 +66,8 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
   const mwSize ndim = 1;
   mwSize dims[] = {1};
   plhs[0] = mxCreateStructArray(ndim, dims, 0, nullptr);
-  for (const unique_ptr<DrakeJoint>& joint : joints) {
+  for (vector<unique_ptr<DrakeJoint>>::const_iterator it = joints.begin(); it != joints.end(); it++) {
+    const unique_ptr<DrakeJoint>& joint = (*it);
     mxArray* joint_struct_in = safelyGetField(prhs[0], joint->getName());
     VectorXd q = matlabToEigen<Eigen::Dynamic, 1>(safelyGetField(joint_struct_in, "q"));
     VectorXd v = matlabToEigen<Eigen::Dynamic, 1>(safelyGetField(joint_struct_in, "v"));
@@ -74,21 +75,21 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
     mxArray* joint_struct_out = mxCreateStructArray(1, dims, 0, nullptr);
 
-    Isometry3d joint_transform = joint->jointTransform(q.data());
+    Isometry3d joint_transform = joint->jointTransform(q);
     safelySetField(joint_struct_out, "joint_transform", eigenToMatlab(joint_transform.matrix()));
 
     DrakeJoint::MotionSubspaceType motion_subspace;
     MatrixXd dmotion_subspace;
-    joint->motionSubspace(q.data(), motion_subspace, &dmotion_subspace);
+    joint->motionSubspace(q, motion_subspace, &dmotion_subspace);
     safelySetField(joint_struct_out, "motion_subspace", eigenToMatlab(motion_subspace));
     safelySetField(joint_struct_out, "dmotion_subspace", eigenToMatlab(dmotion_subspace));
 
     typedef Eigen::Matrix<double, 6, 1> Vector6d;
     Vector6d motion_subspace_dot_times_v;
-    typename Gradient<Vector6d, Eigen::Dynamic>::type dmotion_subspace_dot_times_vdq;
-    typename Gradient<Vector6d, Eigen::Dynamic>::type dmotion_subspace_dot_times_vdv;
+    Gradient<Vector6d, Eigen::Dynamic>::type dmotion_subspace_dot_times_vdq;
+    Gradient<Vector6d, Eigen::Dynamic>::type dmotion_subspace_dot_times_vdv;
 
-    joint->motionSubspaceDotTimesV(q.data(), v.data(), motion_subspace_dot_times_v,
+    joint->motionSubspaceDotTimesV(q, v, motion_subspace_dot_times_v,
         &dmotion_subspace_dot_times_vdq,
         &dmotion_subspace_dot_times_vdv);
     safelySetField(joint_struct_out, "motion_subspace_dot_times_v", eigenToMatlab(motion_subspace_dot_times_v));
@@ -97,13 +98,13 @@ void mexFunction(int nlhs, mxArray* plhs[], int nrhs, const mxArray* prhs[])
 
     MatrixXd qdot_to_v;
     MatrixXd dqdot_to_v;
-    joint->qdot2v(q.data(), qdot_to_v, &dqdot_to_v);
+    joint->qdot2v(q, qdot_to_v, &dqdot_to_v);
     safelySetField(joint_struct_out, "qdot_to_v", eigenToMatlab(qdot_to_v));
     safelySetField(joint_struct_out, "dqdot_to_v", eigenToMatlab(dqdot_to_v));
 
     MatrixXd v_to_qdot;
     MatrixXd dv_to_qdot;
-    joint->v2qdot(q.data(), v_to_qdot, &dv_to_qdot);
+    joint->v2qdot(q, v_to_qdot, &dv_to_qdot);
     safelySetField(joint_struct_out, "v_to_qdot", eigenToMatlab(v_to_qdot));
     safelySetField(joint_struct_out, "dv_to_qdot", eigenToMatlab(dv_to_qdot));
 

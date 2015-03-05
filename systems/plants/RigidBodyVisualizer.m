@@ -7,7 +7,7 @@ classdef RigidBodyVisualizer < Visualizer
   end
   methods
     function obj = RigidBodyVisualizer(manip)
-      obj = obj@Visualizer(getStateFrame(manip));
+      obj = obj@Visualizer(getPositionFrame(manip));
       obj.model = manip;
     end
     function inspector(obj,x0,state_dims,minrange,maxrange,options)
@@ -27,7 +27,8 @@ classdef RigidBodyVisualizer < Visualizer
       if (nargin<2), x0 = getInitialState(obj.model); end
       if (nargin<3), state_dims = 1:getNumPositions(obj.model); end
       [jlmin,jlmax] = getJointLimits(obj.model);
-      jlmin(isinf(jlmin))=-2*pi; jlmax(isinf(jlmax))=2*pi;
+      q0 = x0(1:getNumPositions(obj.model));
+      jlmin(isinf(jlmin))=q0(isinf(jlmin))-2*pi; jlmax(isinf(jlmax))=q0(isinf(jlmax))+2*pi;
       xmin = [jlmin;-100*ones(getNumVelocities(obj.model),1)];
       xmax = [jlmax;100*ones(getNumVelocities(obj.model),1)];
       if (nargin<4), minrange = xmin(state_dims); end
@@ -46,8 +47,8 @@ classdef RigidBodyVisualizer < Visualizer
       % which calls inverse kinematics to drive the specified point on the
       % robot through a Cartesian endpoint (when possible).
       % 
-      % @param body_or_frame_id e.g. from findFrameId,findJointInd, or
-      % findLinkInd
+      % @param body_or_frame_id e.g. from findFrameId,findJointId, or
+      % findLinkId
       % @param pt a 3x1 point in Cartesian space
       % @param q0 (optional) initial pose for the robot @default uses
       % getInitialState()
@@ -85,7 +86,6 @@ classdef RigidBodyVisualizer < Visualizer
           'Value', desired_pt(i), 'Position', [100+280*(i>rows), y+30*rows*(i>rows), 170, 20],...
           'Callback',{@update_display});
 
-        % use a little undocumented matlab to get continuous slider feedback:
         slider_listener{i} = addlistener(slider{i},'ContinuousValueChange',@update_display);
         y = y - 30;
       end

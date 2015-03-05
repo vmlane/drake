@@ -7,6 +7,8 @@ function [com,J,dJ] = getCOM(model,kinsol,robotnum)
 
 if(nargin == 2)
   robotnum = 1;
+elseif robotnum<0 % then do all robots (and the world)
+  robotnum = 0:length(model.name);
 end
 if ~isstruct(kinsol)  
   % treat input as getCOM(model,q)
@@ -21,12 +23,23 @@ if (kinsol.mex)
     error('Drake:RigidBodyManipulator:InvalidKinematics','This kinsol is no longer valid because the mex model ptr has been deleted.');
   end
   
-  if nargout > 2
-    [com,J,dJ] = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
-  elseif nargout > 1
-    [com,J] = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
+  if model.use_new_kinsol
+    if nargout > 2
+      [com,J,dJ] = centerOfMassmex(model.mex_model_ptr, robotnum);
+      dJ = reshape(dJ, size(J, 1), []); % convert to strange second derivative output format
+    elseif nargout > 1
+      [com,J] = centerOfMassmex(model.mex_model_ptr, robotnum);
+    else
+      com = centerOfMassmex(model.mex_model_ptr, robotnum);
+    end
   else
-    com = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
+    if nargout > 2
+      [com,J,dJ] = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
+    elseif nargout > 1
+      [com,J] = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
+    else
+      com = forwardKinmex(model.mex_model_ptr,kinsol.q,0,robotnum,false);
+    end
   end
 else
   nq=getNumPositions(model);

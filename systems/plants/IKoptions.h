@@ -2,28 +2,30 @@
 #define __IKOPTIONS_H__
 //#include "RigidBodyManipulator.h"
 #include <Eigen/Dense>
-using namespace Eigen;
 
+#undef drakeIKoptions_DLLEXPORT
 #if defined(WIN32) || defined(WIN64)
   #if defined(drakeIKoptions_EXPORTS)
-    #define DLLEXPORT __declspec( dllexport )
+    #define drakeIKoptions_DLLEXPORT __declspec( dllexport )
+  #elif defined(drakeIK_EXPORTS) // because this gets built in both the drakeIKoptions target and the drakeIK target...
+    #define drakeIKoptions_DLLEXPORT __declspec( dllexport )
   #else
-    #define DLLEXPORT __declspec( dllimport )
-  #endif
+    #define drakeIKoptions_DLLEXPORT __declspec( dllimport )
+  #endif  
 #else
-  #define DLLEXPORT
+  #define drakeIKoptions_DLLEXPORT
 #endif
 
 class RigidBodyManipulator;
 
-class DLLEXPORT IKoptions
+class drakeIKoptions_DLLEXPORT IKoptions
 {
   private:
     RigidBodyManipulator* robot;
     int nq;
-    MatrixXd Q;
-    MatrixXd Qa;
-    MatrixXd Qv;
+    Eigen::MatrixXd Q;
+    Eigen::MatrixXd Qa;
+    Eigen::MatrixXd Qv;
     bool debug_mode;
     bool sequentialSeedFlag;
     double SNOPT_MajorFeasibilityTolerance;
@@ -31,14 +33,14 @@ class DLLEXPORT IKoptions
     int SNOPT_IterationsLimit;
     int SNOPT_SuperbasicsLimit;
     double SNOPT_MajorOptimalityTolerance;
-    RowVectorXd additional_tSamples;
+    Eigen::RowVectorXd additional_tSamples;
     bool fixInitialState;
-    VectorXd q0_lb;
-    VectorXd q0_ub;
-    VectorXd qd0_lb;
-    VectorXd qd0_ub;
-    VectorXd qdf_lb;
-    VectorXd qdf_ub;
+    Eigen::VectorXd q0_lb;
+    Eigen::VectorXd q0_ub;
+    Eigen::VectorXd qd0_lb;
+    Eigen::VectorXd qd0_ub;
+    Eigen::VectorXd qdf_lb;
+    Eigen::VectorXd qdf_ub;
   protected:
     void setDefaultParams(RigidBodyManipulator* robot);
   public:
@@ -46,9 +48,9 @@ class DLLEXPORT IKoptions
     IKoptions(const IKoptions &rhs);
     ~IKoptions(void);
     RigidBodyManipulator* getRobotPtr() const;
-    void setQ(const MatrixXd &Q);
-    void setQa(const MatrixXd &Qa);
-    void setQv(const MatrixXd &Qv);
+    void setQ(const Eigen::MatrixXd &Q);
+    void setQa(const Eigen::MatrixXd &Qa);
+    void setQv(const Eigen::MatrixXd &Qv);
     void setDebug(bool flag);
     void setSequentialSeedFlag(bool flag);
     void setMajorOptimalityTolerance(double tol);
@@ -57,14 +59,14 @@ class DLLEXPORT IKoptions
     void setMajorIterationsLimit(int limit);
     void setIterationsLimit(int limit);
     void setFixInitialState(bool flag);
-    void setq0(const VectorXd &lb, const VectorXd &ub);
-    void setqd0(const VectorXd &lb, const VectorXd &ub);
-    void setqdf(const VectorXd &lb, const VectorXd &ub);
-    void setAdditionaltSamples(const RowVectorXd &t_samples);
+    void setq0(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub);
+    void setqd0(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub);
+    void setqdf(const Eigen::VectorXd &lb, const Eigen::VectorXd &ub);
+    void setAdditionaltSamples(const Eigen::RowVectorXd &t_samples);
     void updateRobot(const RigidBodyManipulator* robot);
-    void getQ(MatrixXd &Q) const;
-    void getQa(MatrixXd &Qa) const;
-    void getQv(MatrixXd &Qv) const;
+    void getQ(Eigen::MatrixXd &Q) const;
+    void getQa(Eigen::MatrixXd &Qa) const;
+    void getQv(Eigen::MatrixXd &Qv) const;
     bool getDebug() const;
     bool getSequentialSeedFlag() const;
     double getMajorOptimalityTolerance() const;
@@ -72,11 +74,11 @@ class DLLEXPORT IKoptions
     int getSuperbasicsLimit() const;
     int getMajorIterationsLimit() const;
     int getIterationsLimit() const;
-    void getAdditionaltSamples(RowVectorXd &additional_tSamples) const;
+    void getAdditionaltSamples(Eigen::RowVectorXd &additional_tSamples) const;
     bool getFixInitialState() const;
-    void getq0(VectorXd &lb, VectorXd &ub) const;
-    void getqd0(VectorXd &lb, VectorXd &ub) const;
-    void getqdf(VectorXd &lb, VectorXd &ub) const;
+    void getq0(Eigen::VectorXd &lb, Eigen::VectorXd &ub) const;
+    void getqd0(Eigen::VectorXd &lb, Eigen::VectorXd &ub) const;
+    void getqdf(Eigen::VectorXd &lb, Eigen::VectorXd &ub) const;
     void updateRobot(RigidBodyManipulator* new_robot);
 };
 #endif

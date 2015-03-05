@@ -49,7 +49,7 @@ classdef RigidBodyCylinder < RigidBodyGeometry
         % just draw a circle in the viewing plane
         Tview = [x_axis, y_axis, view_axis]';
         valuecheck(svd(Tview),[1;1;1]);  % assert that it's orthonormal
-        theta = 0:0.1:2*pi;
+        theta = 0:0.3:2*pi;
         pts = Tview'*obj.radius*[cos(theta); sin(theta); 0*theta+obj.len/2] + repmat(obj.T(1:3,4),1,length(theta));
         x = pts(1,:)';
         y = pts(2,:)';
@@ -61,16 +61,16 @@ classdef RigidBodyCylinder < RigidBodyGeometry
       
     end 
     
-    function shape = serializeToLCM(obj)
-      shape = drake.lcmt_viewer_geometry_data();
-      shape.type = shape.CYLINDER;
-      shape.string_data = '';
-      shape.num_float_data = 2;
-      shape.float_data = [obj.radius, obj.len];
+    function geometry = serializeToLCM(obj)
+      geometry = drake.lcmt_viewer_geometry_data();
+      geometry.type = geometry.CYLINDER;
+      geometry.string_data = '';
+      geometry.num_float_data = 2;
+      geometry.float_data = [obj.radius, obj.len];
       
-      shape.position = obj.T(1:3,4);
-      shape.quaternion = rotmat2quat(obj.T(1:3,1:3));
-      shape.color = [obj.c(:);1.0];
+      geometry.position = obj.T(1:3,4);
+      geometry.quaternion = rotmat2quat(obj.T(1:3,1:3));
+      geometry.color = [obj.c(:);1.0];
     end
 
     function writeWRLShape(obj,fp,td)

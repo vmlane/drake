@@ -3,11 +3,12 @@
 
 #include "FixedAxisOneDoFJoint.h"
 
-class RevoluteJoint: public FixedAxisOneDoFJoint
+class DLLEXPORT_DRAKEJOINT RevoluteJoint: public FixedAxisOneDoFJoint
 {
   // disable copy construction and assignment
-  RevoluteJoint(const RevoluteJoint&) = delete;
-  RevoluteJoint& operator=(const RevoluteJoint&) = delete;
+  // not available in MSVC2010...
+  // RevoluteJoint(const RevoluteJoint&) = delete;
+  // RevoluteJoint& operator=(const RevoluteJoint&) = delete;
 
 private:
   Eigen::Vector3d rotation_axis;
@@ -16,7 +17,7 @@ public:
 
   virtual ~RevoluteJoint();
 
-  virtual Eigen::Isometry3d jointTransform(double* const q) const; //override;
+  virtual Eigen::Isometry3d jointTransform(const Eigen::Ref<const Eigen::VectorXd>& q) const; //override;
 
 private:
   static Eigen::Matrix<double, TWIST_SIZE, 1> spatialJointAxis(const Eigen::Vector3d& rotation_axis);

@@ -118,32 +118,34 @@ classdef Manipulator < DrakeSystem
       % Helper function to compute the internal forces required to enforce
       % equality constraints
 
-      alpha = 10;  % 1/time constant of position constraint satisfaction (see my latex rigid body notes)
+      alpha = 5;  % 1/time constant of position constraint satisfaction (see my latex rigid body notes)
       beta = 0;    % 1/time constant of velocity constraint satisfaction
 
       phi=[]; psi=[];
       qd = vToqdot(obj, q) * v;
       if ~isempty(obj.position_constraints) && ~isempty(obj.velocity_constraints)
-        [phi,J,dJ] = geval(@obj.positionConstraints,q);
+        [phi,J,dJ] = obj.positionConstraints(q);
         Jdotqd = dJ*reshape(qd*qd',obj.num_positions^2,1);
 
-        [psi,dpsi] = geval(@obj.velocityConstraints,q,qd);
+        [psi,dpsi] = obj.velocityConstraints(q,qd);
         dpsidq = dpsi(:,1:obj.num_positions);
         dpsidqd = dpsi(:,obj.num_positions+1:end);
 
         term1=Hinv*[J;dpsidqd]';
         term2=Hinv*tau;
 
-        constraint_force = -[J;dpsidqd]'*pinv([J*term1;dpsidqd*term1])*[J*term2 + Jdotqd + alpha*J*qd; dpsidqd*term2 + dpsidq*qd + beta*psi];
+        constraint_force = -[J;dpsidqd]'*pinv([J*term1;dpsidqd*term1])*[J*term2 + Jdotqd + 2*alpha*J*qd + alpha^2*phi; dpsidqd*term2 + dpsidq*qd + beta*psi];
       elseif ~isempty(obj.position_constraints)  % note: it didn't work to just have dpsidq,etc=[], so it seems like the best solution is to handle each case...
-        [phi,J,dJ] = geval(@obj.positionConstraints,q);
+        [phi,J,dJ] = obj.positionConstraints(q);
         % todo: find a way to use Jdot*qd directly (ala Twan's code)
         % instead of computing dJ
         Jdotqd = dJ*reshape(qd*qd',obj.num_positions^2,1);
 
-        constraint_force = -J'*pinv(J*Hinv*J')*(J*Hinv*tau + Jdotqd + alpha*J*qd);
+        constraint_force = -J'*pinv(J*Hinv*J')*(J*Hinv*tau + Jdotqd + 2*alpha*J*qd + alpha^2*phi);
+        % useful for debugging:
+        % phi, phidot = J*qd, phiddot = J*Hinv*(tau+constraint_force)+Jdotqd
       elseif ~isempty(obj.velocity_constraints)
-        [psi,J] = geval(@obj.velocityConstraints,q,qd);
+        [psi,J] = obj.velocityConstraints(q,qd);
         dpsidq = J(:,1:obj.num_positions);
         dpsidqd = J(:,obj.num_positions+1:end);
 
@@ -180,7 +182,7 @@ classdef Manipulator < DrakeSystem
         [obj,obj.position_constraint_ids(1,id)] = addStateConstraint(obj,state_con);
       else 
         obj.num_position_constraints = obj.num_position_constraints-obj.position_constraints{id}.num_cnstr;
-        obj = updateStateConstraint(obj,obj.position_constraint_ids(1,id),state_con);
+        obj = updateStateConstraint(obj,obj.position_constraint_ids(1,id),state_con, 1:2*obj.num_positions);
       end
       
       obj.num_position_constraints = obj.num_position_constraints+con.num_cnstr;
@@ -218,6 +220,17 @@ classdef Manipulator < DrakeSystem
       
       obj.num_velocity_constraints = obj.num_velocity_constraints+con.num_cnstr;
       obj.velocity_constraints{id} = con;
+    end
+    
+    function obj = removeAllStateConstraints(obj)
+      obj.num_position_constraints=0;
+      obj.num_velocity_constraints=0;
+      obj.position_constraints = {};  
+      obj.position_constraint_ids = [];
+      obj.velocity_constraints = {};
+      obj.velocity_constraint_ids = []; 
+      obj.joint_limit_constraint_id = [];
+      obj = removeAllStateConstraints@DrakeSystem(obj);
     end
   end
 
@@ -261,7 +274,7 @@ classdef Manipulator < DrakeSystem
       
       varargout = cell(1,nargout);
       for i=1:length(obj.position_constraints)
-        v = cell(1,nargout);
+        v = cell(1,max(nargout,1));
         [v{:}] = obj.position_constraints{i}.eval(q);
         v{1} = v{1} - obj.position_constraints{i}.lb;  % center it around 0
         for j=1:nargout
