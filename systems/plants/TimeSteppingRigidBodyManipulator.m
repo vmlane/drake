@@ -1019,10 +1019,6 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       frame = getFrame(model.manip,varargin{:});
     end
 
-    function str = getBodyOrFrameName(obj,varargin)
-      str = obj.manip.getBodyOrFrameName(varargin{:});
-    end
-
     function model = setBody(model,varargin)
       model.manip = setBody(model.manip,varargin{:});
       model.dirty = true;
@@ -1152,7 +1148,7 @@ classdef TimeSteppingRigidBodyManipulator < DrakeSystem
       varargout = cell(1,nargout);
       [varargout{:}] = getBodyOrFrameName(obj.manip,varargin{:});
     end
-
+    
     function fr = getPositionFrame(obj,robotnum)
         fr = getPositionFrame(obj.manip);
     end

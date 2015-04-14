@@ -24,7 +24,7 @@ classdef QPController < MIMODrakeSystem
 
     qddframe = controller_data.acceleration_input_frame; % input frame for desired qddot
 
-    input_frame = MultiCoordinateFrame({r.getStateFrame,qddframe,atlasFrames.FootContactState,body_accel_input_frames{:}});
+    input_frame = MultiCoordinateFrame({r.getStateFrame,qddframe,FootContactState,body_accel_input_frames{:}});
 
     % whether to output generalized accelerations AND inputs (u)
     if ~isfield(options,'output_qdd')
@@ -304,6 +304,7 @@ classdef QPController < MIMODrakeSystem
     end
     
     supp.bodies = support_bodies;
+    display(sprintf('%d, [%s]',length(supp.bodies),num2str(supp.bodies)));
     supp.contact_pts = contact_pts;
     supp.contact_groups = contact_groups;
     supp.num_contact_pts = n_contact_pts;
@@ -324,7 +325,11 @@ classdef QPController < MIMODrakeSystem
       dim = 3; % 3D
       nd = 4; % for friction cone approx, hard coded for now
       float_idx = 1:6; % indices for floating base dofs
-      act_idx = 1:nq; % indices for actuated dofs
+      if r.floating
+        act_idx = 7:nq; % indices for actuated dofs
+      else
+        act_idx = 1:nq;
+      end
 
       [H,C,B] = manipulatorDynamics(r,q,qd);
 

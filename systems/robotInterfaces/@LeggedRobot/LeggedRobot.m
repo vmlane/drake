@@ -29,7 +29,7 @@ classdef LeggedRobot
       % Get the link index for each foot of the legged robot
       foot_idx = zeros(1,length(obj.foot_names));
       for i = 1:length(obj.foot_names)
-          foot_idx(i) = findLinkInd(obj,obj.foot_names{i});
+          foot_idx(i) = findLinkId(obj,obj.foot_names{i});
       end
     end 
   end
