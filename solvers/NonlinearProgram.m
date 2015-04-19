@@ -1605,7 +1605,7 @@ classdef NonlinearProgram
     end 
   end
   
-  methods(Access = private)
+  methods%(Access = private)
     function infeasible_constraint_name = infeasibleConstraint(obj,x)
       [g,h] = obj.nonlinearConstraints(x);
       fval = [g;h];

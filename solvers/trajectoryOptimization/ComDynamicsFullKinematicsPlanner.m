@@ -105,10 +105,12 @@ classdef ComDynamicsFullKinematicsPlanner < SimpleDynamicsFullKinematicsPlanner
         obj = obj.addCost(v_cost,{obj.h_inds(i);obj.v_inds(:,i+1)});
       end
       
-      %e = ones(obj.nq*(obj.N-2),1);
-      %second_diff_mat = spdiags([e,-2*e,e],[-obj.nq,0,obj.nq],obj.nq*(obj.N-2),obj.nq*obj.N);
-      %Qa = second_diff_mat'*kron(eye(obj.N-2),Qv)*second_diff_mat;
-      %obj = obj.addCost(QuadraticConstraint(0,0,Qa,zeros(obj.nq*obj.N,1)),obj.q_inds);;
+      % adds cost to difference in velocities between two timestamps
+      % e = ones(obj.nq*(obj.N-2),1);
+      % second_diff_mat = spdiags([e,-2*e,e],[-obj.nq,0,obj.nq],obj.nq*(obj.N-2),obj.nq*obj.N);
+      % Qa = 10*second_diff_mat'*kron(eye(obj.N-2),Qv)*second_diff_mat;
+      % obj = obj.addCost(QuadraticConstraint(0,0,Qa,zeros(obj.nq*obj.N,1)),obj.q_inds);
+
 
       function [f,df] = comAccelCost(Q,h,comddot)
         %f = 0.5*h*(comddot'*Q*comddot);
@@ -204,6 +206,14 @@ classdef ComDynamicsFullKinematicsPlanner < SimpleDynamicsFullKinematicsPlanner
         H_cnstr = H_cnstr.setName([{sprintf('A_x*v=H_x[%d]',i)};{sprintf('A_y*v=H_y[%d]',i)};{sprintf('A_z*v=H_z[%d]',i)}]);
         obj = obj.addConstraint(H_cnstr,[{obj.q_inds(:,i)};{obj.v_inds(:,i)};{obj.H_inds(:,i)}],obj.kinsol_dataind(i));
       end
+      
+      % Joint Velocity difference constraint 
+      % for i = 3:obj.N-1
+      %   % try 1
+      %   bound = 1.5*ones(2*(obj.nq-6),1);
+      %   v_cnstr = LinearConstraint(-bound,bound,[eye(obj.nq-6), -eye(obj.nq-6); zeros(obj.nq-6,2*(obj.nq-6))]);
+      %   obj = obj.addConstraint(v_cnstr, obj.v_inds(7:obj.nq,[i,i-1]));
+      % end
     end
     
     function obj = addContactDynamicConstraints(obj,knot_idx,contact_wrench_idx,knot_lambda_idx)
